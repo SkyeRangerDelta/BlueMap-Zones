@@ -8,3 +8,4 @@ description: A BlueMap addon featuring per-marker events.
 website: https://pldyn.net/
 depend:
   - BlueMap
+has-open-classloader: true
