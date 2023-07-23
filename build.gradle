@@ -16,13 +16,12 @@ repositories {
         url = "https://oss.sonatype.org/content/groups/public/"
     }
     maven {
-        name = "JitPack.io"
         url = "https://jitpack.io"
     }
 }
 
 dependencies {
-    compileOnly "io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT"
+    compileOnly "io.papermc.paper:paper-api:1.13-R0.1-SNAPSHOT"
     compileOnly "com.github.BlueMap-Minecraft:BlueMapAPI:v2.6.0"
 }
 

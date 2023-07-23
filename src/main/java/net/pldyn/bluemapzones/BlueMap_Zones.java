@@ -1,24 +1,24 @@
 package net.pldyn.bluemapzones;
 
+import de.bluecolored.bluemap.api.BlueMapAPI;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.Optional;
+import java.util.logging.Logger;
 
 public final class BlueMap_Zones extends JavaPlugin {
 
+    private static final Logger Log = Logger.getLogger("BM Zones");
+
     @Override
     public void onEnable() {
-        // Plugin startup logic
-
-        System.out.println("Zones plugin loaded!");
+        Log.info("Plugin enabled!");
+        BlueMapAPI.onEnable(api -> {
+            Log.info("API Loaded!");
+        });
     }
 
     @Override
     public void onDisable() {
-        // Plugin shutdown logic
-
-        System.out.println("Zones plugin safely halted!");
+        Log.info("Zones halted!");
     }
-
-
 }

@@ -6,4 +6,5 @@ prefix: [BM-Zones]
 authors: [SkyeRangerDelta]
 description: A BlueMap addon featuring per-marker events.
 website: https://pldyn.net/
-depend: [BlueMapAPI]
+depend:
+  - BlueMap
