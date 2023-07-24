@@ -11,6 +11,8 @@ public final class BlueMap_Zones extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        ConfigHandler.confInit();
+
         Log.info("Plugin enabled!");
         BlueMapAPI.onEnable(this::initPlugin);
     }
