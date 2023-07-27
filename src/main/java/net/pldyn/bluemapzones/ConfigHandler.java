@@ -17,8 +17,6 @@ public class ConfigHandler {
         fileInit();
         pluginConfFile.options().copyDefaults(true);
         savePluginConfFile();
-
-
     }
 
     private static void fileInit() {
@@ -32,15 +30,16 @@ public class ConfigHandler {
                 confFile.createNewFile();
             }
             catch (IOException fileCreationErr) {
-                Log.warning("Unable to create a config file on the server!");
+                Log.warning("Unable to create a config file on the server!\n" + fileCreationErr.getMessage());
             }
         }
 
         pluginConfFile = YamlConfiguration.loadConfiguration(confFile);
     }
 
-    private static void createDefaults() {
+    public static void createDefaults() {
         pluginConfFile.addDefault("Game-World", "world");
+        savePluginConfFile();
     }
 
     public static FileConfiguration getPluginConfFile() {
