@@ -38,7 +38,8 @@ public class ConfigHandler {
     }
 
     public static void createDefaults() {
-        pluginConfFile.addDefault("Game-World", "world");
+        pluginConfFile.addDefault("Maps.name", "world");
+        pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
         savePluginConfFile();
     }
 
