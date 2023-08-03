@@ -10,6 +10,7 @@ import de.bluecolored.bluemap.api.math.Shape;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -84,16 +85,50 @@ public final class BlueMap_Zones extends JavaPlugin {
     }
 
     private void handleMarkerSet(MarkerSet markerSet) {
+        ArrayList<ShapedChunk> shapedChunks = new ArrayList<>();
         Map<String, Marker> setMarkers = markerSet.getMarkers();
         Log.info("Catalogging " + setMarkers.size() + " markers.");
-        setMarkers.forEach(this::catalogMarker);
+        for (Map.Entry<String, Marker> entry : setMarkers.entrySet()) {
+            String key = entry.getKey();
+            Marker value = entry.getValue();
+            assert false;
+            shapedChunks.add(catalogMarker(key, value));
+        }
     }
 
-    private void catalogMarker(String k, Marker m) {
-        if (!(m instanceof ShapeMarker shapeMarker)) return;
+    private ShapedChunk catalogMarker(String k, Marker m) {
+        if (!(m instanceof ShapeMarker shapeMarker)) return null;
         Shape markerShape = shapeMarker.getShape();
         Vector2d[] markerPoints = markerShape.getPoints();
+        ShapedChunk workingChunk = new ShapedChunk(shapeMarker);
 
         Log.info("Processing " + shapeMarker.getLabel() + " with " + markerPoints.length + " vertex point(s).");
+        Vector2d shapeMax = markerShape.getMax();
+        Vector2d shapeMin = markerShape.getMin();
+        Log.info(shapeMarker.getLabel() + " has max (" + shapeMax.getX() + ", " + shapeMax.getY() + ").");
+        Log.info(shapeMarker.getLabel() + " has min (" + shapeMin.getX() + ", " + shapeMin.getY() + ").");
+
+        //Collect the number of chunks (rounded down) that the shape covers.
+        double shapeCellsX = Math.floor((shapeMax.getX() - shapeMin.getX()) / 16);
+        double shapeCellsZ = Math.floor((shapeMax.getY() - shapeMin.getY()) / 16);
+
+        //Iterate through each chunk determining the boundaries based on position
+        for (int cX = 0; cX < shapeCellsX; cX++) {
+            for (int cZ = 0; cZ < shapeCellsZ; cZ++) {
+                double chunkMinX = shapeMin.getX() + (cX * 16);
+                double chunkMaxX = shapeMax.getX() + ((cX + 1) * 16);
+                double chunkMinZ = shapeMin.getY() + (cZ * 16);
+                double chunkMaxZ = shapeMax.getY() + ((cZ + 1) * 16);
+
+                if (chunkMaxX >= shapeMin.getX() && chunkMinX <= shapeMax.getX() && chunkMaxZ >= shapeMin.getY() && chunkMinZ <= shapeMax.getY()) {
+                    Vector2d chunkID = new Vector2d((double) cX / 16, (double) (cZ / 16));
+                    workingChunk.addChunk(chunkID);
+                }
+            }
+        }
+
+        Log.info(shapeMarker.getLabel() + " has " + workingChunk.getChunks().size() + " chunks.");
+
+        return workingChunk;
     }
 }
