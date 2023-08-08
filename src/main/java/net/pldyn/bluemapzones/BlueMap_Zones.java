@@ -101,6 +101,7 @@ public final class BlueMap_Zones extends JavaPlugin {
         Shape markerShape = shapeMarker.getShape();
         Vector2d[] markerPoints = markerShape.getPoints();
         ShapedChunk workingChunk = new ShapedChunk(shapeMarker);
+        getServer().getPluginManager().registerEvents(workingChunk, this);
 
         Log.info("Processing " + shapeMarker.getLabel() + " with " + markerPoints.length + " vertex point(s).");
         Vector2d shapeMax = markerShape.getMax();
@@ -109,8 +110,13 @@ public final class BlueMap_Zones extends JavaPlugin {
         Log.info(shapeMarker.getLabel() + " has min (" + shapeMin.getX() + ", " + shapeMin.getY() + ").");
 
         //Collect the number of chunks (rounded down) that the shape covers.
-        double shapeCellsX = Math.floor((shapeMax.getX() - shapeMin.getX()) / 16);
-        double shapeCellsZ = Math.floor((shapeMax.getY() - shapeMin.getY()) / 16);
+        int shapeMaxX = (int) Math.round(Math.floor(shapeMax.getX()));
+        int shapeMaxZ = (int) Math.round(Math.floor(shapeMax.getY()));
+        int shapeMinX = (int) Math.round(Math.floor(shapeMin.getX()));
+        int shapeMinZ = (int) Math.round(Math.floor(shapeMin.getY()));
+
+        int shapeCellsX = Math.floorDiv((shapeMaxX - shapeMinX), 16);
+        int shapeCellsZ = Math.floorDiv((shapeMaxZ - shapeMinZ), 16);
 
         //Iterate through each chunk determining the boundaries based on position
         for (int cX = 0; cX < shapeCellsX; cX++) {
@@ -120,8 +126,13 @@ public final class BlueMap_Zones extends JavaPlugin {
                 double chunkMinZ = shapeMin.getY() + (cZ * 16);
                 double chunkMaxZ = shapeMax.getY() + ((cZ + 1) * 16);
 
-                if (chunkMaxX >= shapeMin.getX() && chunkMinX <= shapeMax.getX() && chunkMaxZ >= shapeMin.getY() && chunkMinZ <= shapeMax.getY()) {
-                    Vector2d chunkID = new Vector2d((double) cX / 16, (double) (cZ / 16));
+                //If the chunk contains the edge of the shape
+                if (chunkMaxX >= shapeMin.getX() && chunkMinX <= shapeMax.getX() &&
+                        chunkMaxZ >= shapeMin.getY() && chunkMinZ <= shapeMax.getY()) {
+                    int chunkX = Math.floorDiv(cX, 16);
+                    int chunkY = Math.floorDiv(cZ, 16);
+                    Log.info("Adding chunk ID (" + chunkX + ", " + chunkY + ").");
+                    Vector2d chunkID = new Vector2d(chunkX, chunkY);
                     workingChunk.addChunk(chunkID);
                 }
             }
