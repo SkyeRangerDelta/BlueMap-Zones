@@ -114,18 +114,18 @@ public final class BlueMap_Zones extends JavaPlugin {
         Log.info(shapeMarker.getLabel() + " has max (" + shapeMaxX + ", " + shapeMaxZ + ").");
         Log.info(shapeMarker.getLabel() + " has min (" + shapeMinX + ", " + shapeMinZ + ").");
 
-        int shapeCellsX = Math.floorDiv((shapeMaxX - shapeMinX), 16);
-        int shapeCellsZ = Math.floorDiv((shapeMaxZ - shapeMinZ), 16);
+        int shapeCellsX = (int) ((double) (shapeMaxX - shapeMinX) / 16);
+        int shapeCellsZ = (int) ((double) (shapeMaxZ - shapeMinZ) / 16);
         Log.info("Shape covers " + shapeCellsX + " X chunks, and " + shapeCellsZ + " Z chunks.");
 
         //Iterate through each chunk determining the boundaries based on position
-        for (int cX = 0; cX <= shapeCellsX; cX++) {
-            for (int cZ = 0; cZ <= shapeCellsZ; cZ++) {
+        for (int cX = 1; cX <= shapeCellsX; cX++) {
+            for (int cZ = 1; cZ <= shapeCellsZ; cZ++) {
                 Log.info("Testing X" + cX + ", Z" + cZ); //342, 84 - 371, 114
-                int chunkMinX = Math.floorDiv(shapeMinX, 16) * 16; //336
-                int chunkMinZ = Math.floorDiv(shapeMinX, 16) * 16; //80
-                int chunkMaxX = Math.floorDiv(shapeMinZ, 16) * 16; //368
-                int chunkMaxZ = Math.floorDiv(shapeMaxZ, 16) * 16; //112
+                int chunkMinX = (Math.floorDiv(shapeMinX, 16) * 16) + (cX * 16);
+                int chunkMaxX = shapeMaxX + ((cX + 1) * 16);
+                int chunkMinZ = (Math.floorDiv(shapeMinZ, 16) * 16) + (cZ * 16);
+                int chunkMaxZ = shapeMaxZ + ((cZ + 1) * 16);
 
                 //If the chunk contains the edge of the shape
                 if (!(chunkMaxX >= shapeMinX && chunkMinX <= shapeMaxX &&
