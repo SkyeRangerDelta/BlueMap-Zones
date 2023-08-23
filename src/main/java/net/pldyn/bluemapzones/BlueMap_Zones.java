@@ -7,6 +7,7 @@ import de.bluecolored.bluemap.api.markers.Marker;
 import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
+import jdk.jfr.Description;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
@@ -87,7 +88,9 @@ public final class BlueMap_Zones extends JavaPlugin {
         ArrayList<ShapedChunk> shapedChunks = new ArrayList<>();
         Map<String, Marker> setMarkers = markerSet.getMarkers();
         Log.info("Catalogging " + setMarkers.size() + " markers.");
+        int shapeCount = 0;
         for (Map.Entry<String, Marker> entry : setMarkers.entrySet()) {
+            Log.info("Thinking about shape " + ++shapeCount + " of " + setMarkers.size());
             String key = entry.getKey();
             Marker value = entry.getValue();
             assert false;
@@ -101,124 +104,35 @@ public final class BlueMap_Zones extends JavaPlugin {
         Vector2d[] markerPoints = markerShape.getPoints();
         ShapedChunk workingChunk = new ShapedChunk(shapeMarker);
         getServer().getPluginManager().registerEvents(workingChunk, this);
+        int vCount = 0;
 
         Log.info("Processing " + shapeMarker.getLabel() + " with " + markerPoints.length + " vertex point(s).");
-        Vector2d shapeMax = markerShape.getMax();
-        Vector2d shapeMin = markerShape.getMin();
+        for (Vector2d vertex : markerPoints) {
+            int chID_X = vertex.getFloorX() / 16;
+            int chID_Y = vertex.getFloorY() / 16;
 
-        //Collect the number of chunks (rounded down) that the shape covers.
-        int shapeMaxX = (int) Math.floor(shapeMax.getX());
-        int shapeMaxZ = (int) Math.floor(shapeMax.getY());
-        int shapeMinX = (int) Math.floor(shapeMin.getX());
-        int shapeMinZ = (int) Math.floor(shapeMin.getY());
-        Log.info(shapeMarker.getLabel() + " has max (" + shapeMaxX + ", " + shapeMaxZ + ").");
-        Log.info(shapeMarker.getLabel() + " has min (" + shapeMinX + ", " + shapeMinZ + ").");
+            Vector2d chID = new Vector2d(chID_X, chID_Y);
 
-        int shapeCellsX = (int) ((double) (shapeMaxX - shapeMinX) / 16);
-        int shapeCellsZ = (int) ((double) (shapeMaxZ - shapeMinZ) / 16);
-        Log.info("Shape covers " + shapeCellsX + " X chunks, and " + shapeCellsZ + " Z chunks.");
+            //Skip if ID already listed
+            if (workingChunk.getChunks().contains(chID)) continue;
 
-        //Iterate through each chunk determining the boundaries based on position
-        for (int cX = 1; cX <= shapeCellsX; cX++) {
-            for (int cZ = 1; cZ <= shapeCellsZ; cZ++) {
-                Log.info("Testing X" + cX + ", Z" + cZ); //342, 84 - 371, 114
-                int chunkMinX = (Math.floorDiv(shapeMinX, 16) * 16) + (cX * 16);
-                int chunkMaxX = shapeMaxX + ((cX + 1) * 16);
-                int chunkMinZ = (Math.floorDiv(shapeMinZ, 16) * 16) + (cZ * 16);
-                int chunkMaxZ = shapeMaxZ + ((cZ + 1) * 16);
-
-                //If the chunk contains the edge of the shape
-                if (!(chunkMaxX >= shapeMinX && chunkMinX <= shapeMaxX &&
-                        chunkMaxZ >= shapeMinZ && chunkMinZ <= shapeMaxZ)) continue;
-
-                int chunkX = Math.floorDiv(chunkMaxX, 16);
-                int chunkY = Math.floorDiv(chunkMaxZ, 16);
-
-                Vector2d chunkID = new Vector2d(chunkX, chunkY);
-
-                //Check for conflicted chunk, determine dom and use it instead
-                ShapedChunk conflictingChunk = conflictedChunk(chunkID, chunkList);
-                if (conflictingChunk != null) {
-                    chunkID = determineDominateChunk(conflictingChunk, workingChunk, chunkID);
-                    if (chunkID == null) {
-                        Log.info("Contesting chunk failed to win");
-                        continue;
-                    }
-                }
-
-                Log.info("Adding chunk ID (" + chunkX + ", " + chunkY + ").");
-                workingChunk.addChunk(chunkID);
-            }
+            Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ").");
+            workingChunk.addChunk(chID);
         }
-
         Log.info(shapeMarker.getLabel() + " has " + workingChunk.getChunks().size() + " chunks.");
 
         return workingChunk;
     }
 
-    private ShapedChunk conflictedChunk(Vector2d chunkID, ArrayList<ShapedChunk> shapedChunks) {
+    @Description("Returns a the ShapedChunk if it shares contains the tested Chunk ID")
+    private boolean conflictedChunk(Vector2d chunkID, ArrayList<ShapedChunk> shapedChunks) {
         for (ShapedChunk shapedChunk : shapedChunks) {
             if (shapedChunk.getChunks().contains(chunkID)) {
-                Log.info("Detected chunk conflict, altering indexes.");
-                return shapedChunk;
+                Log.info("Detected chunk conflict with " + shapedChunk.getShape().getLabel());
+                return true;
             };
         }
 
-        return null;
-    }
-
-    private Vector2d determineDominateChunk(ShapedChunk existingChunk, ShapedChunk newChunk, Vector2d chunkID) {
-        ArrayList<Vector2d> existingChunkVertices = getChunkVertices(existingChunk, chunkID);
-        ArrayList<Vector2d> newChunkVertices = getChunkVertices(newChunk, chunkID);
-
-        //Older/processed chunk has no area - new chunk wins
-        if (existingChunkVertices.size() < 3) return chunkID;
-
-        //New chunk has no area - old chunk wins
-        if (newChunkVertices.size() < 3) return null;
-
-        double existingArea = determineShapeArea(existingChunkVertices);
-        double newArea = determineShapeArea(newChunkVertices);
-
-        //Old chunk area larger
-        if (existingArea <= newArea) {
-            Log.info("Existing chunk had larger area of " + existingArea);
-            return null;
-        }
-
-        Log.info("New chunk has larger area of " + existingArea);
-
-        //Otherwise, remove chunkID from existing chunk (lost) and return new chunk for addition
-        ArrayList<Vector2d> existingChunkVerticesEdited = existingChunk.getChunks();
-        existingChunkVerticesEdited.remove(chunkID);
-        existingChunk.setChunks(existingChunkVerticesEdited);
-        return chunkID;
-    }
-
-    private ArrayList<Vector2d> getChunkVertices(ShapedChunk newChunk, Vector2d chunkID) {
-        ArrayList<Vector2d> vList = new ArrayList<>();
-        for (Vector2d vertex : newChunk.getChunks()) {
-            int vX = Math.floorDiv(vertex.getFloorX(), 16);
-            int vZ = Math.floorDiv(vertex.getFloorY(), 16);
-            if (vX == chunkID.getX() && vZ == chunkID.getY()) {
-                vList.add(vertex);
-            }
-        }
-
-        return vList;
-    }
-
-    private double determineShapeArea(ArrayList<Vector2d> vertexList) {
-        double xySum = 0, yxSum = 0, vSum = 0;
-        for (int i = 0; i < vertexList.size(); i++) {
-            Vector2d vertex = vertexList.get(i);
-            Vector2d nextVertex = vertexList.get(i+1);
-
-            xySum += vertex.getX() * nextVertex.getY();
-            yxSum += vertex.getY() * nextVertex.getX();
-        }
-
-        vSum = xySum + yxSum;
-        return vSum / 2;
+        return false;
     }
 }
