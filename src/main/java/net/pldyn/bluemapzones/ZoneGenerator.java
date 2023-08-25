@@ -7,10 +7,10 @@ import de.bluecolored.bluemap.api.markers.Marker;
 import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
-import jdk.jfr.Description;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -91,10 +91,11 @@ public class ZoneGenerator {
         Vector2d[] markerPoints = markerShape.getPoints();
         ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape, ((ShapeMarker) m).getShapeY());
 
-        int vCount = 0;
-        Vector2d lastChunk = new Vector2d(0, 0);
+        int cCount = 0;
+        ZonedChunk previousChunk = new ZonedChunk(new Vector2d(0, 0));
 
-        Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length + " vertex point(s).");
+        Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
+                + " vertex point(s).");
         for (Vector2d vertex : markerPoints) {
             int chID_X = vertex.getFloorX() / 16;
             int chID_Y = vertex.getFloorY() / 16;
@@ -102,33 +103,50 @@ public class ZoneGenerator {
             Vector2d chID = new Vector2d(chID_X, chID_Y);
 
             //Are we in a new chunk?
-            if (chID.equals(lastChunk)) continue;
+            if (chID.equals(previousChunk.getChunkId())) continue;
 
             //Skip if ID already listed
-            if (newZone.getOwnedChunks().contains(chID)) continue;
+            if (newZone.isOwnedChunk(chID)) continue;
 
-            //Is conflicted?
-            if (conflictedChunk(chID)) continue;
+            ZonedChunk newChunk = new ZonedChunk(chID);
 
-            Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ").");
-            newZone.addOwnedChunk(chID);
-            lastChunk = chID;
+            //Is conflicted also owned by another shape?
+            ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chID);
+            if (!conflictedOwners.isEmpty()) {
+                for (ZonedShape owner : conflictedOwners) {
+                    newChunk = owner.getOwnedChunks().get(chID);
+                    newChunk.setConflicted(true);
+                }
+            };
+
+            newChunk.addOwner(newZone);
+            newZone.addOwnedChunk(chID, newChunk);
+
+            if (newChunk.isConflicted()) {
+                Log.info("Adding conflicted chunk ID (" + chID_X + ", " + chID_Y + ")");
+            }
+            else {
+                Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ")");
+            }
+
+            previousChunk = newChunk;
         }
-        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " chunks.");
+        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " chunks and "
+                + cCount + " conflicted chunks.");
 
         return newZone;
     }
 
-    @Description("Returns a the ShapedChunk if it shares contains the tested Chunk ID")
-    private boolean conflictedChunk(Vector2d chunkID) {
+    private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
+        ArrayList<ZonedShape> conflictedOwners = new ArrayList<>();
         for (ZonedShape zonedShape : zonedShapes) {
-            ArrayList<Vector2d> ownedChunks = zonedShape.getOwnedChunks();
-            if (ownedChunks.contains(chunkID)) {
+            HashMap<Vector2d, ZonedChunk> ownedChunks = zonedShape.getOwnedChunks();
+            if (ownedChunks.containsKey(zonedChunkId)) {
                 Log.info("Detected chunk conflict with " + zonedShape.getLabel());
-                return true;
+                conflictedOwners.add(zonedShape);
             };
         }
 
-        return false;
+        return conflictedOwners;
     }
 }

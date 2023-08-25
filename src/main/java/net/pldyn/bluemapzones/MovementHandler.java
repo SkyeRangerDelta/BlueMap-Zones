@@ -30,38 +30,39 @@ public class MovementHandler implements Listener {
         Location oldLocation = e.getFrom();
         Location newLocation = e.getTo();
 
-        Vector2d newChunkLocation = new Vector2d(Math.floorDiv(newLocation.getBlockX(), 16),
+        Vector2d newChunkId = new Vector2d(Math.floorDiv(newLocation.getBlockX(), 16),
                 Math.floorDiv(newLocation.getBlockZ(), 16));
 
         if (!hasChangedChunks(oldLocation, newLocation)) return;
 
-        isNewZone(pc, newChunkLocation);
+        isNewZone(pc, newChunkId);
     }
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent e) {
         Player pc = e.getPlayer();
         Location pcLocation = pc.getLocation();
-        Vector2d chunkLocation = new Vector2d(Math.floorDiv(pcLocation.getBlockX(), 16),
+        Vector2d chunkLocationID = new Vector2d(Math.floorDiv(pcLocation.getBlockX(), 16),
                 Math.floorDiv(pcLocation.getBlockZ(), 16));
+        String chunkName = getChunkName(chunkLocationID);
 
-        playerLocations.put(pc, getOwnedChunkName(chunkLocation));
-        printNewLocation(pc, chunkLocation);
+        playerLocations.put(pc, chunkName);
+        printNewLocation(pc, chunkLocationID, chunkName);
     }
 
-    private void isNewZone(Player pc, Vector2d newChunkLocation) {
+    private void isNewZone(Player pc, Vector2d chunkId) {
         String pcLastZone = playerLocations.get(pc), newZone = "Wilderness";
 
         for (ZonedShape zone : zonedShapes) {
-            if (zone.isOwnedChunk(newChunkLocation)) {
-                newZone = zone.getLabel();
+            if (zone.isOwnedChunk(chunkId)) {
+                newZone = zone.getOwnedChunks().get(chunkId).getName();
             }
         }
 
         if (pcLastZone.equals(newZone)) return;
 
         playerLocations.put(pc, newZone);
-        printNewLocation(pc, newChunkLocation);
+        printNewLocation(pc, chunkId, newZone);
     }
 
     private boolean hasChangedChunks(Location oldLoc, Location newLoc) {
@@ -73,16 +74,15 @@ public class MovementHandler implements Listener {
         this.zonedShapes = zonedShapes;
     }
 
-    private void printNewLocation(Player pc, Vector2d chunkID) {
-        String newLocArea = playerLocations.get(pc);
-
-        Log.info("Player entered (" + chunkID.getX() + ", " + chunkID.getY() + ") - " + newLocArea);
-        pc.sendMessage("Entered " + newLocArea);
+    private void printNewLocation(Player pc, Vector2d chunkID, String newZone) {
+        Log.info("Player entered (" + chunkID.getX() + ", " + chunkID.getY() + ") - " + newZone);
+        pc.sendMessage("Entered " + newZone);
     }
 
-    private String getOwnedChunkName(Vector2d chunkId) {
+    private String getChunkName(Vector2d chunkId) {
         for (ZonedShape zone : zonedShapes) {
-            if (zone.isOwnedChunk(chunkId)) return zone.getLabel();
+            HashMap<Vector2d, ZonedChunk> ownedChunks = zone.getOwnedChunks();
+            if (ownedChunks.containsKey(chunkId)) return ownedChunks.get(chunkId).getName();
         }
 
         return "Wilderness";

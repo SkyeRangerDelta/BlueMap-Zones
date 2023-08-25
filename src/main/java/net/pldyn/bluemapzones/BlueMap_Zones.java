@@ -10,6 +10,7 @@ public final class BlueMap_Zones extends JavaPlugin {
 
     private static final Logger Log = Logger.getLogger("BM Zones");
     public MovementHandler movementHandler;
+    public ToolHandler toolHandler;
 
     @Override
     public void onEnable() {
@@ -28,6 +29,8 @@ public final class BlueMap_Zones extends JavaPlugin {
     private void doInit(BlueMapAPI blueMapAPI) {
         ArrayList<ZonedShape> zonedShapes = new ZoneGenerator(blueMapAPI).getZonedShapes();
         movementHandler = new MovementHandler(zonedShapes);
+        toolHandler = new ToolHandler(zonedShapes);
         getServer().getPluginManager().registerEvents(movementHandler, this);
+        getServer().getPluginManager().registerEvents(toolHandler, this);
     }
 }

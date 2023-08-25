@@ -5,31 +5,36 @@ import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 public class ZonedShape extends ShapeMarker {
 
     private static final Logger Log = Logger.getLogger("BM Zones");
-    private ArrayList<Vector2d> ownedChunks = new ArrayList<Vector2d>();
+    private HashMap<Vector2d, ZonedChunk> ownedChunks = new HashMap<>();
 
     public ZonedShape(String label, Shape shape, float shapeY) {
         super(label, shape, shapeY);
         Log.info("Created a new zone shape.");
     }
 
-    public ArrayList<Vector2d> getOwnedChunks() {
+    public HashMap<Vector2d, ZonedChunk> getOwnedChunks() {
         return ownedChunks;
     }
 
-    public void setOwnedChunks(ArrayList<Vector2d> ownedChunks) {
+    public void setOwnedChunks(HashMap<Vector2d, ZonedChunk> ownedChunks) {
         this.ownedChunks = ownedChunks;
     }
 
-    public void addOwnedChunk(Vector2d newOwnedChunk) {
-        this.ownedChunks.add(newOwnedChunk);
+    public void addOwnedChunk(Vector2d chunkId, ZonedChunk newOwnedChunk) {
+        this.ownedChunks.put(chunkId, newOwnedChunk);
     }
 
-    public boolean isOwnedChunk(Vector2d chunkID) {
-        return ownedChunks.contains(chunkID);
+    public boolean isOwnedChunk(Vector2d chunkId) {
+        return ownedChunks.containsKey(chunkId);
+    }
+
+    public boolean isOwnedChunk(ZonedChunk ownedChunk) {
+        return ownedChunks.containsValue(ownedChunk);
     }
 }
