@@ -22,6 +22,7 @@ public class ToolHandler implements Listener {
     }
     @EventHandler
     public void onPlayerUseTool(PlayerInteractEvent e) {
+        e.setCancelled(true);
         Player pc = e.getPlayer();
         Material handItem = pc.getInventory().getItemInMainHand().getType();
         Action completedAction = e.getAction();
