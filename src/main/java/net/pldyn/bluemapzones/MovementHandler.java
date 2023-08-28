@@ -1,7 +1,10 @@
 package net.pldyn.bluemapzones;
 
 import com.flowpowered.math.vector.Vector2d;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -10,6 +13,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 public class MovementHandler implements Listener {
@@ -44,25 +48,27 @@ public class MovementHandler implements Listener {
         Location pcLocation = pc.getLocation();
         Vector2d chunkLocationID = new Vector2d(Math.floorDiv(pcLocation.getBlockX(), 16),
                 Math.floorDiv(pcLocation.getBlockZ(), 16));
-        String chunkName = getChunkName(chunkLocationID);
+        ZonedChunk chunk = getChunk(chunkLocationID);
 
-        playerLocations.put(pc, chunkName);
-        printNewLocation(pc, chunkLocationID, chunkName);
+        if (chunk == null) return;
+
+        playerLocations.put(pc, chunk.getName());
+        printNewLocation(pc, chunk, chunk.isConflicted());
     }
 
     private void isNewZone(Player pc, Vector2d chunkId) {
-        String pcLastZone = playerLocations.get(pc), newZone = "Wilderness";
+        String pcLastZone = playerLocations.get(pc);
 
-        for (ZonedShape zone : zonedShapes) {
-            if (zone.isOwnedChunk(chunkId)) {
-                newZone = zone.getOwnedChunks().get(chunkId).getName();
-            }
-        }
+        ZonedChunk chunk = getChunk(chunkId);
+        if (chunk == null) return;
 
-        if (pcLastZone.equals(newZone)) return;
+        String chunkName = chunk.getName();
 
-        playerLocations.put(pc, newZone);
-        printNewLocation(pc, chunkId, newZone);
+        if (pcLastZone.equals(chunkName)) return;
+
+
+        playerLocations.put(pc, chunkName);
+        printNewLocation(pc, chunk, chunk.isConflicted());
     }
 
     private boolean hasChangedChunks(Location oldLoc, Location newLoc) {
@@ -74,17 +80,44 @@ public class MovementHandler implements Listener {
         this.zonedShapes = zonedShapes;
     }
 
-    private void printNewLocation(Player pc, Vector2d chunkID, String newZone) {
-        Log.info("Player entered (" + chunkID.getX() + ", " + chunkID.getY() + ") - " + newZone);
-        pc.sendMessage("Entered " + newZone);
+    private void printNewLocation(Player pc, ZonedChunk chunk, boolean isBoundary) {
+        Vector2d chunkId = chunk.getChunkId();
+
+        Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunk.getName());
+
+        if (!isBoundary) doTitle(pc, chunk);
     }
 
-    private String getChunkName(Vector2d chunkId) {
+    private void doTitle(Player pc, ZonedChunk chunk) {
+        Vector2d chunkId = chunk.getChunkId();
+        String chunkName = chunk.getName();
+
+        Title newAreaTitle = Title.title(
+                Component.text(chunkName),
+                Component.text(buildSubtitle(chunkName))
+        );
+
+        Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunk.getName());
+
+        pc.showTitle(newAreaTitle);
+        pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
+    }
+
+    private ZonedChunk getChunk(Vector2d chunkId) {
         for (ZonedShape zone : zonedShapes) {
             HashMap<Vector2d, ZonedChunk> ownedChunks = zone.getOwnedChunks();
-            if (ownedChunks.containsKey(chunkId)) return ownedChunks.get(chunkId).getName();
+            if (ownedChunks.containsKey(chunkId)) return ownedChunks.get(chunkId);
         }
 
-        return "Wilderness";
+        return null;
+    }
+
+    private String buildSubtitle(String mainTitle) {
+        String subtitle = "";
+        for (int i = 0; i < mainTitle.length() + 10; i++) {
+            subtitle = subtitle.concat("_");
+        }
+
+        return subtitle;
     }
 }
