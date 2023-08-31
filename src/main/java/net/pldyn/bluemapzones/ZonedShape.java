@@ -37,4 +37,22 @@ public class ZonedShape extends ShapeMarker {
     public boolean isOwnedChunk(ZonedChunk ownedChunk) {
         return ownedChunks.containsValue(ownedChunk);
     }
+
+    public Vector2d getMaxChunk() {
+        Vector2d max = this.getShape().getMax();
+
+        int maxX = Math.floorDiv(max.getFloorX(), 16);
+        int maxZ = Math.floorDiv(max.getFloorY(), 16);
+
+        return new Vector2d(maxX, maxZ);
+    }
+
+    public Vector2d getMinChunk() {
+        Vector2d min = this.getShape().getMin();
+
+        int minX = Math.floorDiv(min.getFloorX(), 16);
+        int minZ = Math.floorDiv(min.getFloorY(), 16);
+
+        return new Vector2d(minX, minZ);
+    }
 }

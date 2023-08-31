@@ -13,7 +13,6 @@ import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Objects;
 import java.util.logging.Logger;
 
 public class MovementHandler implements Listener {

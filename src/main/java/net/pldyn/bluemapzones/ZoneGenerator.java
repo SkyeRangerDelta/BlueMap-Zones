@@ -137,6 +137,14 @@ public class ZoneGenerator {
         return newZone;
     }
 
+    private void generateShapeInteriors() {
+        //Algo for filling hollow space
+        for (ZonedShape shape : zonedShapes) {
+            Vector2d chunkMax = shape.getMaxChunk();
+            Vector2d chunkMin = shape.getMinChunk();
+        }
+    }
+
     private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
         ArrayList<ZonedShape> conflictedOwners = new ArrayList<>();
         for (ZonedShape zonedShape : zonedShapes) {
