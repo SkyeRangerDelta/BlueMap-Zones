@@ -120,6 +120,7 @@ public class ZoneGenerator {
             };
 
             newChunk.addOwner(newZone);
+            newChunk.setBoundary(true);
             newZone.addOwnedChunk(chID, newChunk);
 
             if (newChunk.isConflicted()) {
@@ -142,6 +143,33 @@ public class ZoneGenerator {
         for (ZonedShape shape : zonedShapes) {
             Vector2d chunkMax = shape.getMaxChunk();
             Vector2d chunkMin = shape.getMinChunk();
+
+            HashMap<Vector2d, ZonedChunk> knownChunks = shape.getOwnedChunks();
+
+            //Iterate across X chunks inside shape
+            for (int x = chunkMin.getFloorX(); x <= chunkMax.getFloorX(); x++) {
+
+                //Iterate across Z chunks inside shape
+                for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
+                    Vector2d testId = new Vector2d(x, z);
+                    boolean insideShape = false, boundarySegment = false;
+                    int boundaryIntersections = 0;
+
+                    //Chunk is already known
+                    if (knownChunks.containsKey(testId)) continue;
+
+                    //Axis check each chunk within the bounds of the shape
+                    //external chunks won't be able to hit all sides once
+                    //Check North
+                    
+                    //Check West
+
+                    //Check South
+
+                    //Check East
+
+                }
+            }
         }
     }
 

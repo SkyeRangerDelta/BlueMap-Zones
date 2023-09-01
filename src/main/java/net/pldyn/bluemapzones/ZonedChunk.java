@@ -7,6 +7,7 @@ import java.util.ArrayList;
 public class ZonedChunk {
     private Vector2d chunkId;
     private boolean isConflicted = false;
+    private boolean isBoundary = false;
     private ArrayList<ZonedShape> owners = new ArrayList<>();
 
     public ZonedChunk(Vector2d chunkId) {
@@ -31,6 +32,13 @@ public class ZonedChunk {
 
     public void setConflicted(boolean conflicted) {
         isConflicted = conflicted;
+    }
+    public void setBoundary(boolean boundary) {
+        isBoundary = boundary;
+    }
+
+    public boolean isBoundary() {
+        return isBoundary;
     }
 
     public void setOwners(ArrayList<ZonedShape> owners) {
