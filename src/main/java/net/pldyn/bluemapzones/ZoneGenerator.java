@@ -152,7 +152,7 @@ public class ZoneGenerator {
                 //Iterate across Z chunks inside shape
                 for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
                     Vector2d testId = new Vector2d(x, z);
-                    boolean insideShape = false, boundarySegment = false;
+                    boolean insideShape = false;
                     int boundaryIntersections = 0;
 
                     //Chunk is already known
@@ -161,7 +161,20 @@ public class ZoneGenerator {
                     //Axis check each chunk within the bounds of the shape
                     //external chunks won't be able to hit all sides once
                     //Check North
-                    
+                    for (int n = z; n > chunkMin.getFloorY(); n--) {
+                        boolean boundarySegment = false;
+                        if (n - 1 < chunkMin.getFloorY()) continue;
+
+                        Vector2d adjChunkId = new Vector2d(x, n - 1);
+
+                        if (knownChunks.containsKey(adjChunkId)) {
+                            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
+                            if (adjChunk.isBoundary() && !boundarySegment) {
+                                boundarySegment = true;
+                                boundaryIntersections++;
+                            }
+                        }
+                    }
                     //Check West
 
                     //Check South

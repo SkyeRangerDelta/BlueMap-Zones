@@ -3,6 +3,7 @@ package net.pldyn.bluemapzones;
 import com.flowpowered.math.vector.Vector2d;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class ZonedChunk {
     private Vector2d chunkId;
