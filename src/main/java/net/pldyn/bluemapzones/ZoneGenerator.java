@@ -153,7 +153,6 @@ public class ZoneGenerator {
                 for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
                     Vector2d testId = new Vector2d(x, z);
                     boolean insideShape = false;
-                    int boundaryIntersections = 0;
 
                     //Chunk is already known
                     if (knownChunks.containsKey(testId)) continue;
@@ -161,29 +160,55 @@ public class ZoneGenerator {
                     //Axis check each chunk within the bounds of the shape
                     //external chunks won't be able to hit all sides once
                     //Check North
-                    for (int n = z; n > chunkMin.getFloorY(); n--) {
-                        boolean boundarySegment = false;
-                        if (n - 1 < chunkMin.getFloorY()) continue;
+                    if (!checkNorth(chunkMax, chunkMin, knownChunks, testId)) continue;
 
-                        Vector2d adjChunkId = new Vector2d(x, n - 1);
-
-                        if (knownChunks.containsKey(adjChunkId)) {
-                            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
-                            if (adjChunk.isBoundary() && !boundarySegment) {
-                                boundarySegment = true;
-                                boundaryIntersections++;
-                            }
-                        }
-                    }
                     //Check West
+                    if (!checkWest(chunkMax, chunkMin, knownChunks)) continue;
 
                     //Check South
+                    if (!checkSouth(chunkMax, chunkMin, knownChunks)) continue;
 
                     //Check East
+                    if (!checkEast(chunkMax, chunkMin, knownChunks)) continue;
 
                 }
             }
         }
+    }
+
+    private boolean checkNorth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
+            ZonedChunk> knownChunks, Vector2d testID) {
+
+        int boundaryIntersections = 0;
+
+        boolean boundarySegment = false;
+
+        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
+
+        if (knownChunks.containsKey(adjChunkId)) {
+            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
+            if (adjChunk.isBoundary() && !boundarySegment) {
+                boundarySegment = true;
+                boundaryIntersections++;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean checkWest(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
+            ZonedChunk> knownChunks) {
+        return false;
+    }
+
+    private boolean checkSouth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
+            ZonedChunk> knownChunks) {
+        return false;
+    }
+
+    private boolean checkEast(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
+            ZonedChunk> knownChunks) {
+        return false;
     }
 
     private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
