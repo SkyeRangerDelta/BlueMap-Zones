@@ -197,17 +197,32 @@ public class ZoneGenerator {
     }
 
     private boolean checkWest(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks) {
+            ZonedChunk> knownChunks, Vector2d testID) {
+
+        int boundaryIntersections = 0;
+
+        boolean boundarySegment = false;
+
+        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
+
+        if (knownChunks.containsKey(adjChunkId)) {
+            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
+            if (adjChunk.isBoundary() && !boundarySegment) {
+                boundarySegment = true;
+                boundaryIntersections++;
+            }
+        }
+
         return false;
     }
 
     private boolean checkSouth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks) {
+            ZonedChunk> knownChunks, Vector2d testID) {
         return false;
     }
 
     private boolean checkEast(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks) {
+            ZonedChunk> knownChunks, Vector2d testID) {
         return false;
     }
 
