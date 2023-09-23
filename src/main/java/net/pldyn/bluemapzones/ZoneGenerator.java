@@ -146,31 +146,20 @@ public class ZoneGenerator {
 
             HashMap<Vector2d, ZonedChunk> knownChunks = shape.getOwnedChunks();
 
-            //Iterate across X chunks inside shape
-            for (int x = chunkMin.getFloorX(); x <= chunkMax.getFloorX(); x++) {
+            //Iterate across Z chunks inside shape (N -> S)
+            for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
 
-                //Iterate across Z chunks inside shape
-                for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
+                //Iterate across X chunks inside shape (W -> E)
+                for (int x = chunkMin.getFloorX(); x <= chunkMax.getFloorX(); x++) {
                     Vector2d testId = new Vector2d(x, z);
-                    boolean insideShape = false;
 
-                    //Chunk is already known
+                    //b4007438
+                    //If chunk already known - skip
                     if (knownChunks.containsKey(testId)) continue;
 
-                    //Axis check each chunk within the bounds of the shape
-                    //external chunks won't be able to hit all sides once
-                    //Check North
-                    if (!checkNorth(chunkMax, chunkMin, knownChunks, testId)) continue;
 
-                    //Check West
-                    if (!checkWest(chunkMax, chunkMin, knownChunks)) continue;
 
-                    //Check South
-                    if (!checkSouth(chunkMax, chunkMin, knownChunks)) continue;
-
-                    //Check East
-                    if (!checkEast(chunkMax, chunkMin, knownChunks)) continue;
-
+                    shape.addOwnedChunk(testId, new ZonedChunk(testId));
                 }
             }
         }
@@ -179,19 +168,8 @@ public class ZoneGenerator {
     private boolean checkNorth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
             ZonedChunk> knownChunks, Vector2d testID) {
 
-        int boundaryIntersections = 0;
-
-        boolean boundarySegment = false;
-
-        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
-
-        if (knownChunks.containsKey(adjChunkId)) {
-            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
-            if (adjChunk.isBoundary() && !boundarySegment) {
-                boundarySegment = true;
-                boundaryIntersections++;
-            }
-        }
+        //Is there a boundary chunk north of this ID?
+        if (testID.getFloorX())
 
         return false;
     }
