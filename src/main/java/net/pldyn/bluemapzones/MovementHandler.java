@@ -18,7 +18,7 @@ import java.util.logging.Logger;
 public class MovementHandler implements Listener {
 
     private static final Logger Log = Logger.getLogger("BM Zones");
-    private static HashMap<Player, String> playerLocations = new HashMap<>();
+    private static final HashMap<Player, String> playerLocations = new HashMap<>();
     private ArrayList<ZonedShape> zonedShapes;
 
     public MovementHandler(ArrayList<ZonedShape> zonedShapes) {
@@ -49,25 +49,31 @@ public class MovementHandler implements Listener {
                 Math.floorDiv(pcLocation.getBlockZ(), 16));
         ZonedChunk chunk = getChunk(chunkLocationID);
 
-        if (chunk == null) return;
-
-        playerLocations.put(pc, chunk.getName());
-        printNewLocation(pc, chunk, chunk.isConflicted());
+        if (chunk == null) {
+            playerLocations.put(pc, "Wilderness");
+            printNewLocation(pc, "Wilderness", false, chunkLocationID);
+        }
+        else {
+            playerLocations.put(pc, chunk.getName());
+            printNewLocation(pc, chunk.getName(), chunk.isConflicted(), chunkLocationID);
+        }
     }
 
     private void isNewZone(Player pc, Vector2d chunkId) {
         String pcLastZone = playerLocations.get(pc);
 
         ZonedChunk chunk = getChunk(chunkId);
-        if (chunk == null) return;
 
-        String chunkName = chunk.getName();
-
-        if (pcLastZone.equals(chunkName)) return;
-
-
-        playerLocations.put(pc, chunkName);
-        printNewLocation(pc, chunk, chunk.isConflicted());
+        if (chunk == null) {
+            if (pcLastZone.equals("Wilderness")) return;
+            playerLocations.put(pc, "Wilderness");
+            printNewLocation(pc, "Wilderness", false, chunkId);
+        }
+        else {
+            if (pcLastZone.equals(chunk.getName())) return;
+            playerLocations.put(pc, chunk.getName());
+            printNewLocation(pc, chunk.getName(), chunk.isConflicted(), chunkId);
+        }
     }
 
     private boolean hasChangedChunks(Location oldLoc, Location newLoc) {
@@ -79,24 +85,14 @@ public class MovementHandler implements Listener {
         this.zonedShapes = zonedShapes;
     }
 
-    private void printNewLocation(Player pc, ZonedChunk chunk, boolean isBoundary) {
-        Vector2d chunkId = chunk.getChunkId();
-
-        Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunk.getName());
-
-        if (!isBoundary) doTitle(pc, chunk);
-    }
-
-    private void doTitle(Player pc, ZonedChunk chunk) {
-        Vector2d chunkId = chunk.getChunkId();
-        String chunkName = chunk.getName();
+    private void printNewLocation(Player pc, String chunkName, boolean isBoundary, Vector2d chunkId) {
 
         Title newAreaTitle = Title.title(
                 Component.text(chunkName),
                 Component.text(buildSubtitle(chunkName))
         );
 
-        Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunk.getName());
+        Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
 
         pc.showTitle(newAreaTitle);
         pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);

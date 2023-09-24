@@ -32,7 +32,11 @@ public class ZoneGenerator {
             return;
         }
 
+        //Build shapes and their bounds
         handleMarkerSet(objectiveSet);
+
+        //Build shape interiors
+        //generateShapeInteriors();
     }
 
     public ArrayList<ZonedShape> getZonedShapes() {
@@ -132,17 +136,30 @@ public class ZoneGenerator {
 
             previousChunk = newChunk;
         }
-        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " chunks and "
-                + cCount + " conflicted chunks.");
+        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " boundary chunks and "
+                + cCount + " conflicted boundary chunks.");
 
         return newZone;
     }
 
     private void generateShapeInteriors() {
+        int shapeC = 1;
+        int cellC = 1;
+
         //Algo for filling hollow space
         for (ZonedShape shape : zonedShapes) {
+            Log.info("Beginning shape interior build for shape " + shapeC + " of " + zonedShapes.size());
+            shapeC++;
+
             Vector2d chunkMax = shape.getMaxChunk();
             Vector2d chunkMin = shape.getMinChunk();
+
+            int shapeLength = chunkMax.getFloorX() - chunkMin.getFloorX();
+            int shapeHeight = chunkMin.getFloorY() - chunkMin.getFloorY();
+
+            int shapeCellCount = shapeLength * shapeHeight;
+
+            Log.info("Shape has " + shapeCellCount + " (" + shapeLength + " * " + shapeHeight + ").");
 
             HashMap<Vector2d, ZonedChunk> knownChunks = shape.getOwnedChunks();
 
@@ -153,84 +170,60 @@ public class ZoneGenerator {
                 for (int x = chunkMin.getFloorX(); x <= chunkMax.getFloorX(); x++) {
                     Vector2d testId = new Vector2d(x, z);
 
+                    Log.info("Testing chunk ID (" + testId.getFloorX() + ", " + testId.getFloorY() +
+                            "). Chunk " + cellC + "/" + shapeCellCount);
+                    cellC++;
+
                     //b4007438
                     //If chunk already known - skip
                     if (knownChunks.containsKey(testId)) continue;
 
-
-
-                    shape.addOwnedChunk(testId, new ZonedChunk(testId));
+                    //Test for inside?
+                    if (isInsideShape(testId, chunkMax.getFloorX(), knownChunks)) {
+                        ZonedChunk newChunk = new ZonedChunk(testId);
+                        newChunk.addOwner(shape);
+                        shape.addOwnedChunk(testId, new ZonedChunk(testId));
+                    }
                 }
             }
         }
     }
 
-    private boolean checkNorth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks, Vector2d testID) {
+    private boolean isInsideShape(Vector2d testId, int xMax, HashMap<Vector2d,
+            ZonedChunk> knownChunks) {
 
-        //Is there a boundary chunk north of this ID?
-        if (testID.getFloorX())
+        boolean tangent = false;
+        int boundCount = 0;
+        boolean lastCellBoundary = false;
 
-        return false;
-    }
-
-    private boolean checkWest(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks, Vector2d testID) {
-
-        int boundaryIntersections = 0;
-
-        boolean boundarySegment = false;
-
-        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
-
-        if (knownChunks.containsKey(adjChunkId)) {
-            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
-            if (adjChunk.isBoundary() && !boundarySegment) {
-                boundarySegment = true;
-                boundaryIntersections++;
+        //Iterating to the east (x++) via ray cast with tangent check
+        for (int i = testId.getFloorX(); i <= xMax; i++) {
+            if (knownChunks.containsKey(new Vector2d(i, testId.getFloorY()))) {
+                //Contested cell is on the periphery
+                if (lastCellBoundary) {
+                    //Last checked cell was also a bound, possible tangent
+                    tangent = true;
+                }
+                else {
+                    //Crossed a bound
+                    lastCellBoundary = true;
+                    boundCount++;
+                }
+            }
+            else {
+                lastCellBoundary = false;
             }
         }
 
-        return false;
-    }
+        //True if odd bound count / outside
+        boolean castCheck = boundCount % 2 != 0;
 
-    private boolean checkSouth(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks, Vector2d testID) {
+        //If possible inside but there was a tangent
+        //ie, glanced the side
+        boolean isInside = !tangent || !castCheck;
+        Log.info("Cell is " + (isInside ? "inside" : "outside") + " the shape.");
 
-        int boundaryIntersections = 0;
-
-        boolean boundarySegment = false;
-
-        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
-
-        if (knownChunks.containsKey(adjChunkId)) {
-            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
-            if (adjChunk.isBoundary() && !boundarySegment) {
-                boundarySegment = true;
-                boundaryIntersections++;
-            }
-        }
-        return false;
-    }
-
-    private boolean checkEast(Vector2d chunkMax, Vector2d chunkMin, HashMap<Vector2d,
-            ZonedChunk> knownChunks, Vector2d testID) {
-
-        int boundaryIntersections = 0;
-
-        boolean boundarySegment = false;
-
-        Vector2d adjChunkId = new Vector2d(testID.getFloorX(), testID.getFloorY() - 1);
-
-        if (knownChunks.containsKey(adjChunkId)) {
-            ZonedChunk adjChunk = knownChunks.get(adjChunkId);
-            if (adjChunk.isBoundary() && !boundarySegment) {
-                boundarySegment = true;
-                boundaryIntersections++;
-            }
-        }
-
-        return false;
+        return isInside;
     }
 
     private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
