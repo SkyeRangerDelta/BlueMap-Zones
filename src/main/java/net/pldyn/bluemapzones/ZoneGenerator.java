@@ -8,10 +8,7 @@ import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class ZoneGenerator {
@@ -140,6 +137,64 @@ public class ZoneGenerator {
                 + cCount + " conflicted boundary chunks.");
 
         return newZone;
+    }
+
+    private ArrayList<Vector2d> doBresenham(Vector2d lastChunkId, Vector2d nextChunkId) {
+        //Run Bresenham Line to retrofill gaps in boundary segments
+        int x1 = lastChunkId.getFloorX();
+        int x2 = nextChunkId.getFloorX();
+        int z1 = lastChunkId.getFloorY();
+        int z2 = nextChunkId.getFloorY();
+
+        ArrayList<Vector2d> lineIds = new ArrayList<>();
+
+        int dx = Math.abs(x2 - x1);
+        int dz = Math.abs(z2 - z1);
+
+        int sX = Integer.signum(x2 - x1);
+        int sZ = Integer.signum(z2 - z1);
+
+        boolean flip = false;
+        if (dz > dx) {
+            flip = true;
+            int temp = dx;
+            dx = dz;
+            dz = temp;
+        }
+
+        int decision = 2 * dz - dx;
+
+        int workingX = x1;
+        int workingZ = z1;
+
+        for (int i = 0; i < dx; i++) {
+            if (decision >= 0) {
+                if (flip) {
+                    workingX += sX;
+                }
+                else {
+                   workingZ += sZ;
+                }
+
+                decision -= 2 * dx;
+            }
+
+            if (flip) {
+                workingZ += sZ;
+            }
+            else {
+                workingX += sX;
+            }
+
+            decision += 2 * dx;
+
+            //Testing coord
+            Log.info("Adding Bresenham ID (" + workingX + ", " + workingZ + ").");
+            lineIds.add(new Vector2d(workingX, workingZ));
+        }
+
+        Log.info("Found " + lineIds.size() + " missing chunks.");
+        return lineIds;
     }
 
     private void generateShapeInteriors() {
