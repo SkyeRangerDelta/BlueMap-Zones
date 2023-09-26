@@ -102,41 +102,57 @@ public class ZoneGenerator {
             int chID_Y = vertex.getFloorY() / 16;
 
             Vector2d chID = new Vector2d(chID_X, chID_Y);
+            Vector2d lastChunkId = previousChunk.getChunkId();
 
             //Are we in a new chunk?
-            if (chID.equals(previousChunk.getChunkId())) continue;
+            if (chID.equals(lastChunkId)) continue;
 
             //Skip if ID already listed
             if (newZone.isOwnedChunk(chID)) continue;
 
-            ZonedChunk newChunk = new ZonedChunk(chID);
-
-            //Is conflicted also owned by another shape?
-            ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chID);
-            if (!conflictedOwners.isEmpty()) {
-                for (ZonedShape owner : conflictedOwners) {
-                    newChunk = owner.getOwnedChunks().get(chID);
-                    newChunk.setConflicted(true);
+            //Is the chunk adjacent to the previous?
+            if (!isAdjacent(lastChunkId, chID)) {
+                ArrayList<Vector2d> missingChunks = doBresenham(lastChunkId, chID);
+                for (Vector2d chunk:missingChunks) {
+                    addChunkToShape(chunk, newZone);
                 }
-            };
-
-            newChunk.addOwner(newZone);
-            newChunk.setBoundary(true);
-            newZone.addOwnedChunk(chID, newChunk);
-
-            if (newChunk.isConflicted()) {
-                Log.info("Adding conflicted chunk ID (" + chID_X + ", " + chID_Y + ")");
-            }
-            else {
-                Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ")");
             }
 
-            previousChunk = newChunk;
+            previousChunk = addChunkToShape(chID, newZone);
+
         }
         Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " boundary chunks and "
                 + cCount + " conflicted boundary chunks.");
 
         return newZone;
+    }
+
+    private ZonedChunk addChunkToShape(Vector2d chID, ZonedShape newZone) {
+        ZonedChunk newChunk = new ZonedChunk(chID);
+        int chID_X = chID.getFloorX();
+        int chID_Y = chID.getFloorY();
+
+        //Is conflicted also owned by another shape?
+        ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chID);
+        if (!conflictedOwners.isEmpty()) {
+            for (ZonedShape owner : conflictedOwners) {
+                newChunk = owner.getOwnedChunks().get(chID);
+                newChunk.setConflicted(true);
+            }
+        };
+
+        newChunk.addOwner(newZone);
+        newChunk.setBoundary(true);
+        newZone.addOwnedChunk(chID, newChunk);
+
+        if (newChunk.isConflicted()) {
+            Log.info("Adding conflicted chunk ID (" + chID_X + ", " + chID_Y + ")");
+        }
+        else {
+            Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ")");
+        }
+
+        return newChunk;
     }
 
     private boolean isAdjacent(Vector2d lastChunkId, Vector2d testId) {
