@@ -139,6 +139,19 @@ public class ZoneGenerator {
         return newZone;
     }
 
+    private boolean isAdjacent(Vector2d lastChunkId, Vector2d testId) {
+        //Check E, W, S, N (in order) for immediate adjacency
+        int prevX = lastChunkId.getFloorX();
+        int prevZ = lastChunkId.getFloorY();
+        int testX = testId.getFloorX();
+        int testZ = testId.getFloorY();
+
+        return testX + 1 == prevX && testZ == prevZ ||
+                testX - 1 == prevX && testZ == prevZ ||
+                testX == prevX && testZ + 1 == prevZ ||
+                testX == prevX && testZ - 1 == prevZ;
+    }
+
     private ArrayList<Vector2d> doBresenham(Vector2d lastChunkId, Vector2d nextChunkId) {
         //Run Bresenham Line to retrofill gaps in boundary segments
         int x1 = lastChunkId.getFloorX();
