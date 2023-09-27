@@ -93,63 +93,84 @@ public class ZoneGenerator {
         ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape, ((ShapeMarker) m).getShapeY());
 
         int cCount = 0;
-        ZonedChunk previousChunk = new ZonedChunk(new Vector2d(0, 0));
 
         Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
                 + " vertex point(s).");
+
+        ZonedShape newZone2 = generateShapeBoundary(markerPoints, newZone);
+
+        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " boundary chunks and "
+                + cCount + " conflicted boundary chunks.");
+
+        return newZone2;
+    }
+
+    private ZonedShape generateShapeBoundary(Vector2d[] markerPoints, ZonedShape newZone) {
+        Vector2d previousChunk = null;
+
         for (Vector2d vertex : markerPoints) {
             int chID_X = vertex.getFloorX() / 16;
             int chID_Y = vertex.getFloorY() / 16;
 
             Vector2d chID = new Vector2d(chID_X, chID_Y);
-            Vector2d lastChunkId = previousChunk.getChunkId();
+
+            ZonedChunk newChunk = new ZonedChunk(chID);
+
+            if (previousChunk == null) {
+                newChunk = addChunk(newChunk, chID, newZone);
+
+                newZone.addOwnedChunk(chID, newChunk);
+
+                previousChunk = chID;
+
+                continue;
+            }
 
             //Are we in a new chunk?
-            if (chID.equals(lastChunkId)) continue;
+            if (chID.equals(previousChunk)) continue;
 
             //Skip if ID already listed
             if (newZone.isOwnedChunk(chID)) continue;
 
-            //Is the chunk adjacent to the previous?
-            if (!isAdjacent(lastChunkId, chID)) {
-                ArrayList<Vector2d> missingChunks = doBresenham(lastChunkId, chID);
+            if (!isAdjacent(previousChunk, chID)) {
+                ArrayList<Vector2d> missingChunks = doBresenham(previousChunk, chID);
                 for (Vector2d chunk:missingChunks) {
-                    addChunkToShape(chunk, newZone);
+                    if (newZone.isOwnedChunk(chunk) || chunk.equals(chID) || chunk.equals(previousChunk)) continue;
+                    ZonedChunk bresenhamChunk = addChunk(newChunk, chID, newZone);
+                    newZone.addOwnedChunk(chID, bresenhamChunk);
                 }
             }
+            else {
+                newChunk = addChunk(newChunk, chID, newZone);
 
-            previousChunk = addChunkToShape(chID, newZone);
+                newZone.addOwnedChunk(chID, newChunk);
+            }
+
+            previousChunk = chID;
 
         }
-        Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " boundary chunks and "
-                + cCount + " conflicted boundary chunks.");
 
         return newZone;
     }
 
-    private ZonedChunk addChunkToShape(Vector2d chID, ZonedShape newZone) {
-        ZonedChunk newChunk = new ZonedChunk(chID);
-        int chID_X = chID.getFloorX();
-        int chID_Y = chID.getFloorY();
-
+    private ZonedChunk addChunk(ZonedChunk newChunk, Vector2d chId, ZonedShape newZone) {
         //Is conflicted also owned by another shape?
-        ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chID);
+        ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chId);
         if (!conflictedOwners.isEmpty()) {
             for (ZonedShape owner : conflictedOwners) {
-                newChunk = owner.getOwnedChunks().get(chID);
+                newChunk = owner.getOwnedChunks().get(chId);
                 newChunk.setConflicted(true);
             }
         };
 
         newChunk.addOwner(newZone);
         newChunk.setBoundary(true);
-        newZone.addOwnedChunk(chID, newChunk);
 
         if (newChunk.isConflicted()) {
-            Log.info("Adding conflicted chunk ID (" + chID_X + ", " + chID_Y + ")");
+            Log.info("Adding conflicted chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
         }
         else {
-            Log.info("Adding chunk ID (" + chID_X + ", " + chID_Y + ")");
+            Log.info("Adding chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
         }
 
         return newChunk;
@@ -222,7 +243,6 @@ public class ZoneGenerator {
             lineIds.add(new Vector2d(workingX, workingZ));
         }
 
-        Log.info("Found " + lineIds.size() + " missing chunks.");
         return lineIds;
     }
 
