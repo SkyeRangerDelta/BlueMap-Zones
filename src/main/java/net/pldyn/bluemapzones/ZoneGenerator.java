@@ -33,7 +33,7 @@ public class ZoneGenerator {
         handleMarkerSet(objectiveSet);
 
         //Build shape interiors
-        //generateShapeInteriors();
+        generateShapeInteriors();
     }
 
     public ArrayList<ZonedShape> getZonedShapes() {
@@ -92,12 +92,12 @@ public class ZoneGenerator {
         Vector2d[] markerPoints = markerShape.getPoints();
         ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape, ((ShapeMarker) m).getShapeY());
 
-        int cCount = 0;
-
         Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
                 + " vertex point(s).");
 
-        ZonedShape newZone2 = generateShapeBoundary(markerPoints, newZone);
+        ZonedShape newZone2 = buildShapeBoundary(markerPoints, newZone);
+
+        int cCount = newZone2.getConflictedChunks().size();
 
         Log.info(newZone.getLabel() + " has " + newZone.getOwnedChunks().size() + " boundary chunks and "
                 + cCount + " conflicted boundary chunks.");
@@ -105,49 +105,51 @@ public class ZoneGenerator {
         return newZone2;
     }
 
-    private ZonedShape generateShapeBoundary(Vector2d[] markerPoints, ZonedShape newZone) {
-        Vector2d previousChunk = null;
+    private ZonedShape buildShapeBoundary(Vector2d[] markerPoints, ZonedShape newZone) {
+        Vector2d prevChunk = null;
+        ArrayList<Vector2d> shapeChunks = new ArrayList<>();
+        ArrayList<Vector2d> bresenhamChunks = new ArrayList<>();
 
-        for (Vector2d vertex : markerPoints) {
-            int chID_X = vertex.getFloorX() / 16;
-            int chID_Y = vertex.getFloorY() / 16;
+        //Build all chunk IDs
+        for (Vector2d markerPoint : markerPoints) {
+            Vector2d markerChunkId = new Vector2d(Math.floorDiv(markerPoint.getFloorX(), 16),
+                    Math.floorDiv(markerPoint.getFloorY(), 16));
 
-            Vector2d chID = new Vector2d(chID_X, chID_Y);
+            shapeChunks.add(markerChunkId);
+        }
 
-            ZonedChunk newChunk = new ZonedChunk(chID);
+        //Iterate across chunks and do magic
+        for (Vector2d chunkId : shapeChunks) {
+            if (prevChunk == null) {
+                ZonedChunk newChunk = addChunk(new ZonedChunk(chunkId), chunkId, newZone);
+                prevChunk = chunkId;
 
-            if (previousChunk == null) {
-                newChunk = addChunk(newChunk, chID, newZone);
-
-                newZone.addOwnedChunk(chID, newChunk);
-
-                previousChunk = chID;
-
+                newZone.addOwnedChunk(chunkId, newChunk);
                 continue;
             }
 
-            //Are we in a new chunk?
-            if (chID.equals(previousChunk)) continue;
-
-            //Skip if ID already listed
-            if (newZone.isOwnedChunk(chID)) continue;
-
-            if (!isAdjacent(previousChunk, chID)) {
-                ArrayList<Vector2d> missingChunks = doBresenham(previousChunk, chID);
-                for (Vector2d chunk:missingChunks) {
-                    if (newZone.isOwnedChunk(chunk) || chunk.equals(chID) || chunk.equals(previousChunk)) continue;
-                    ZonedChunk bresenhamChunk = addChunk(newChunk, chID, newZone);
-                    newZone.addOwnedChunk(chID, bresenhamChunk);
-                }
-            }
-            else {
-                newChunk = addChunk(newChunk, chID, newZone);
-
-                newZone.addOwnedChunk(chID, newChunk);
+            if (chunkId == prevChunk) continue;
+            if (newZone.isOwnedChunk(chunkId)) {
+                prevChunk = chunkId;
+                continue;
             }
 
-            previousChunk = chID;
+            if (!isAdjacent(prevChunk, chunkId)) {
+                //Run bresenham for non-adjacent chunks
+                bresenhamChunks.addAll(doBresenham(prevChunk, chunkId));
+            }
 
+            ZonedChunk newChunk = addChunk(new ZonedChunk(chunkId), chunkId, newZone);
+            newZone.addOwnedChunk(chunkId, newChunk);
+
+            prevChunk = chunkId;
+        }
+
+        for (Vector2d bresenhamChunk : bresenhamChunks) {
+            if (newZone.isOwnedChunk(bresenhamChunk)) continue;
+
+            ZonedChunk bresenhamId = addChunk(new ZonedChunk(bresenhamChunk), bresenhamChunk, newZone);
+            newZone.addOwnedChunk(bresenhamChunk, bresenhamId);
         }
 
         return newZone;
@@ -183,10 +185,10 @@ public class ZoneGenerator {
         int testX = testId.getFloorX();
         int testZ = testId.getFloorY();
 
-        return testX + 1 == prevX && testZ == prevZ ||
-                testX - 1 == prevX && testZ == prevZ ||
-                testX == prevX && testZ + 1 == prevZ ||
-                testX == prevX && testZ - 1 == prevZ;
+        return (testX + 1 == prevX && testZ == prevZ) ||
+                (testX - 1 == prevX && testZ == prevZ) ||
+                (testX == prevX && testZ + 1 == prevZ) ||
+                (testX == prevX && testZ - 1 == prevZ);
     }
 
     private ArrayList<Vector2d> doBresenham(Vector2d lastChunkId, Vector2d nextChunkId) {
@@ -239,8 +241,11 @@ public class ZoneGenerator {
             decision += 2 * dx;
 
             //Testing coord
-            Log.info("Adding Bresenham ID (" + workingX + ", " + workingZ + ").");
-            lineIds.add(new Vector2d(workingX, workingZ));
+            Vector2d id = new Vector2d(workingX, workingZ);
+            if (!lineIds.contains(id)) {
+                Log.info("Adding Bresenham ID (" + workingX + ", " + workingZ + ").");
+                lineIds.add(id);
+            }
         }
 
         return lineIds;

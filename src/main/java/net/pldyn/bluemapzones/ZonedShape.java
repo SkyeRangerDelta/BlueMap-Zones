@@ -55,4 +55,13 @@ public class ZonedShape extends ShapeMarker {
 
         return new Vector2d(minX, minZ);
     }
+
+    public HashMap<Vector2d, ZonedChunk> getConflictedChunks() {
+        HashMap<Vector2d, ZonedChunk> conflictedChunks = new HashMap<>();
+        for (ZonedChunk chunk : ownedChunks.values()) {
+            if (chunk.isConflicted()) conflictedChunks.put(chunk.getChunkId(), chunk);
+        }
+
+        return conflictedChunks;
+    }
 }
