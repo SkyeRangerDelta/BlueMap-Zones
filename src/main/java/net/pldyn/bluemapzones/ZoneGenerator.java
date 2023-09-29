@@ -251,6 +251,16 @@ public class ZoneGenerator {
         return lineIds;
     }
 
+    /*
+        /\
+        | Z-
+        |
+ X- <---*---> X+
+        |
+        | Z+
+        \/
+     */
+
     private void generateShapeInteriors() {
         int shapeC = 1;
         int cellC = 1;
@@ -264,75 +274,37 @@ public class ZoneGenerator {
             Vector2d chunkMin = shape.getMinChunk();
 
             int shapeLength = chunkMax.getFloorX() - chunkMin.getFloorX();
-            int shapeHeight = chunkMin.getFloorY() - chunkMin.getFloorY();
+            int shapeHeight = chunkMax.getFloorY() - chunkMax.getFloorY();
 
-            int shapeCellCount = shapeLength * shapeHeight;
+            int shapeMaxCellCount = shapeLength * shapeHeight;
 
-            Log.info("Shape has " + shapeCellCount + " (" + shapeLength + " * " + shapeHeight + ").");
+            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY(); z++) {
+                ArrayList<Vector2d> rowSets = new ArrayList<>();
+                ArrayList<Vector2d> setChunks = new ArrayList<>();
+                int lastIdX = chunkMin.getFloorX() - 2; //Initialize to impossible adjacent X
 
-            HashMap<Vector2d, ZonedChunk> knownChunks = shape.getOwnedChunks();
+                for (Vector2d chunkId : shape.getOwnedChunks().keySet()) {
+                    if (chunkId.getFloorY() != z) continue;
+                    setChunks.add(chunkId);
+                }
 
-            //Iterate across Z chunks inside shape (N -> S)
-            for (int z = chunkMin.getFloorY(); z <= chunkMax.getFloorY(); z++) {
-
-                //Iterate across X chunks inside shape (W -> E)
-                for (int x = chunkMin.getFloorX(); x <= chunkMax.getFloorX(); x++) {
-                    Vector2d testId = new Vector2d(x, z);
-
-                    Log.info("Testing chunk ID (" + testId.getFloorX() + ", " + testId.getFloorY() +
-                            "). Chunk " + cellC + "/" + shapeCellCount);
-                    cellC++;
-
-                    //b4007438
-                    //If chunk already known - skip
-                    if (knownChunks.containsKey(testId)) continue;
-
-                    //Test for inside?
-                    if (isInsideShape(testId, chunkMax.getFloorX(), knownChunks)) {
-                        ZonedChunk newChunk = new ZonedChunk(testId);
-                        newChunk.addOwner(shape);
-                        shape.addOwnedChunk(testId, new ZonedChunk(testId));
+                for (Vector2d chunkId : setChunks) {
+                    if (chunkId.getFloorX() - 1 == lastIdX) {
+                        //Adjacent
+                        lastIdX = chunkId.getFloorX();
+                        continue;
                     }
+
+                    rowSets.add(chunkId);
+                    lastIdX = chunkId.getFloorX();
+                }
+
+                if (rowSets.size() == 1) continue;
+                if (rowChunks.size() % 2 != 0) {
+                    // | *       * |
                 }
             }
         }
-    }
-
-    private boolean isInsideShape(Vector2d testId, int xMax, HashMap<Vector2d,
-            ZonedChunk> knownChunks) {
-
-        boolean tangent = false;
-        int boundCount = 0;
-        boolean lastCellBoundary = false;
-
-        //Iterating to the east (x++) via ray cast with tangent check
-        for (int i = testId.getFloorX(); i <= xMax; i++) {
-            if (knownChunks.containsKey(new Vector2d(i, testId.getFloorY()))) {
-                //Contested cell is on the periphery
-                if (lastCellBoundary) {
-                    //Last checked cell was also a bound, possible tangent
-                    tangent = true;
-                }
-                else {
-                    //Crossed a bound
-                    lastCellBoundary = true;
-                    boundCount++;
-                }
-            }
-            else {
-                lastCellBoundary = false;
-            }
-        }
-
-        //True if odd bound count / outside
-        boolean castCheck = boundCount % 2 != 0;
-
-        //If possible inside but there was a tangent
-        //ie, glanced the side
-        boolean isInside = !tangent || !castCheck;
-        Log.info("Cell is " + (isInside ? "inside" : "outside") + " the shape.");
-
-        return isInside;
     }
 
     private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
