@@ -179,16 +179,20 @@ public class ZoneGenerator {
     }
 
     private boolean isAdjacent(Vector2d lastChunkId, Vector2d testId) {
-        //Check E, W, S, N (in order) for immediate adjacency
+        //Check E, W, S, N (in order) for immediate or diagonal adjacency
         int prevX = lastChunkId.getFloorX();
         int prevZ = lastChunkId.getFloorY();
         int testX = testId.getFloorX();
         int testZ = testId.getFloorY();
 
-        return (testX + 1 == prevX && testZ == prevZ) ||
-                (testX - 1 == prevX && testZ == prevZ) ||
-                (testX == prevX && testZ + 1 == prevZ) ||
-                (testX == prevX && testZ - 1 == prevZ);
+        return (testX + 1 == prevX && testZ == prevZ) ||    //E
+                (testX - 1 == prevX && testZ == prevZ) ||   //W
+                (testX == prevX && testZ + 1 == prevZ) ||   //S
+                (testX == prevX && testZ - 1 == prevZ) ||   //N
+                (testX + 1 == prevX && testZ + 1 == prevZ) ||   //SE
+                (testX + 1 == prevX && testZ - 1 == prevZ) ||   //NE
+                (testX - 1 == prevX && testZ + 1 == prevZ) ||   //SW
+                (testX - 1 == prevX && testZ - 1 == prevZ); //NW
     }
 
     private ArrayList<Vector2d> doBresenham(Vector2d lastChunkId, Vector2d nextChunkId) {
@@ -278,32 +282,20 @@ public class ZoneGenerator {
 
             int shapeMaxCellCount = shapeLength * shapeHeight;
 
-            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY(); z++) {
-                ArrayList<Vector2d> rowSets = new ArrayList<>();
-                ArrayList<Vector2d> setChunks = new ArrayList<>();
-                int lastIdX = chunkMin.getFloorX() - 2; //Initialize to impossible adjacent X
-
+            //Target "inside" chunk
+            for (int z = chunkMax.getFloorY(); z < chunkMax.getFloorY(); z++) {
+                ArrayList<Vector2d> rowChunks = new ArrayList<>();
                 for (Vector2d chunkId : shape.getOwnedChunks().keySet()) {
                     if (chunkId.getFloorY() != z) continue;
-                    setChunks.add(chunkId);
+                    rowChunks.add(chunkId);
                 }
 
-                for (Vector2d chunkId : setChunks) {
-                    if (chunkId.getFloorX() - 1 == lastIdX) {
-                        //Adjacent
-                        lastIdX = chunkId.getFloorX();
-                        continue;
-                    }
+                if (rowChunks.size() != 2) continue;
 
-                    rowSets.add(chunkId);
-                    lastIdX = chunkId.getFloorX();
-                }
-
-                if (rowSets.size() == 1) continue;
-                if (rowChunks.size() % 2 != 0) {
-                    // | *       * |
-                }
+                Vector2d fillStartPoint = rowChunks.get(0);
             }
+
+            //Run recursive boundary fill
         }
     }
 
@@ -312,7 +304,6 @@ public class ZoneGenerator {
         for (ZonedShape zonedShape : zonedShapes) {
             HashMap<Vector2d, ZonedChunk> ownedChunks = zonedShape.getOwnedChunks();
             if (ownedChunks.containsKey(zonedChunkId)) {
-                Log.info("Detected chunk conflict with " + zonedShape.getLabel());
                 conflictedOwners.add(zonedShape);
             };
         }
