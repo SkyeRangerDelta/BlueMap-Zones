@@ -274,29 +274,7 @@ public class ZoneGenerator {
             Log.info("Beginning shape interior build for shape " + shapeC + " of " + zonedShapes.size());
             shapeC++;
 
-            Vector2d chunkMax = shape.getMaxChunk();
-            Vector2d chunkMin = shape.getMinChunk();
-
-            int shapeLength = chunkMax.getFloorX() - chunkMin.getFloorX();
-            int shapeHeight = chunkMax.getFloorY() - chunkMax.getFloorY();
-
-            int shapeMaxCellCount = shapeLength * shapeHeight;
-
-
-
-            //Target "inside" chunk
-            for (int z = chunkMax.getFloorY(); z < chunkMax.getFloorY(); z++) {
-                ArrayList<Vector2d> rowChunks = new ArrayList<>();
-                for (Vector2d chunkId : shape.getOwnedChunks().keySet()) {
-                    if (chunkId.getFloorY() != z) continue;
-                    rowChunks.add(chunkId);
-                }
-
-                if (rowChunks.size() != 2) continue;
-
-                shape.buildInterior(rowChunks.get(0));
-                break;
-            }
+            shape.doInteriorGeneration();
         }
     }
 

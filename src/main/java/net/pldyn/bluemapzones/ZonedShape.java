@@ -12,6 +12,8 @@ public class ZonedShape extends ShapeMarker {
 
     private static final Logger Log = Logger.getLogger("BM Zones");
     private HashMap<Vector2d, ZonedChunk> ownedChunks = new HashMap<>();
+    public Vector2d maxChunk = getMaxChunk();
+    public Vector2d minChunk = getMinChunk();
 
     public ZonedShape(String label, Shape shape, float shapeY) {
         super(label, shape, shapeY);
@@ -65,8 +67,46 @@ public class ZonedShape extends ShapeMarker {
         return conflictedChunks;
     }
 
-    public void buildInterior(Vector2d startingId) {
+    public void doInteriorGeneration() {
+        Vector2d chunkMax = getMaxChunk();
+        Vector2d chunkMin = getMinChunk();
+
+        int shapeLength = chunkMax.getFloorX() - chunkMin.getFloorX();
+        int shapeHeight = chunkMax.getFloorY() - chunkMin.getFloorY();
+
+        int shapeMaxPossibleCellCount = shapeLength * shapeHeight;
+        Log.info("Shape has maximum cell count of " + shapeMaxPossibleCellCount);
+        Vector2d startingId = null;
+
+        //Target "inside" chunk
+        for (int z = chunkMin.getFloorY(); z < chunkMax.getFloorY(); z++) {
+            ArrayList<Vector2d> rowChunks = new ArrayList<>();
+            for (Vector2d chunkId : ownedChunks.keySet()) {
+                if (chunkId.getFloorY() != z) continue;
+                rowChunks.add(chunkId);
+            }
+
+            Log.info("Row chunks has " + rowChunks.size());
+            if (rowChunks.size() == 2) {
+                startingId = rowChunks.get(0).add(1, 0);
+                break;
+            }
+        }
+
+        Log.info("Found a starting ID at " + startingId);
+        buildInterior(startingId);
+    }
+
+    private void buildInterior(Vector2d startingId) {
+        if (startingId == null) return;
+        if ((startingId.getFloorX() > maxChunk.getFloorX()) ||
+            (startingId.getFloorX() < minChunk.getFloorX()) ||
+            (startingId.getFloorY() > maxChunk.getFloorY()) ||
+            (startingId.getFloorY() < minChunk.getFloorY())) return;
+
         if (!ownedChunks.containsKey(startingId)) {
+            Log.info("Running interior build on chunk (" + startingId.getFloorX() +
+                    ", " + startingId.getFloorY() + ")");
             ZonedChunk newChunk = new ZonedChunk(startingId);
             newChunk.addOwner(this);
             ownedChunks.put(startingId, newChunk);
