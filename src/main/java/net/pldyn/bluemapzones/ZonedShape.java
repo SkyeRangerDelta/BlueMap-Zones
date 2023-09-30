@@ -64,4 +64,17 @@ public class ZonedShape extends ShapeMarker {
 
         return conflictedChunks;
     }
+
+    public void buildInterior(Vector2d startingId) {
+        if (!ownedChunks.containsKey(startingId)) {
+            ZonedChunk newChunk = new ZonedChunk(startingId);
+            newChunk.addOwner(this);
+            ownedChunks.put(startingId, newChunk);
+
+            buildInterior(startingId.add(1, 0)); //E
+            buildInterior(startingId.sub(1, 0)); //W
+            buildInterior(startingId.add(0, 1)); //S
+            buildInterior(startingId.sub(0, 1)); //N
+        }
+    }
 }

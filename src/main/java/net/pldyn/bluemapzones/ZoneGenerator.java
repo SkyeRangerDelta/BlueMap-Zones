@@ -282,6 +282,8 @@ public class ZoneGenerator {
 
             int shapeMaxCellCount = shapeLength * shapeHeight;
 
+
+
             //Target "inside" chunk
             for (int z = chunkMax.getFloorY(); z < chunkMax.getFloorY(); z++) {
                 ArrayList<Vector2d> rowChunks = new ArrayList<>();
@@ -292,10 +294,9 @@ public class ZoneGenerator {
 
                 if (rowChunks.size() != 2) continue;
 
-                Vector2d fillStartPoint = rowChunks.get(0);
+                shape.buildInterior(rowChunks.get(0));
+                break;
             }
-
-            //Run recursive boundary fill
         }
     }
 
