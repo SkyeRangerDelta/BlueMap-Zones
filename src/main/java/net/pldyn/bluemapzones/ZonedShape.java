@@ -78,12 +78,21 @@ public class ZonedShape extends ShapeMarker {
         Log.info("Shape has maximum cell count of " + shapeMaxPossibleCellCount);
         Vector2d startingId = null;
 
-        //Target "inside" chunk
+        //Target "inside" chunk - find *all* inside chunk possibilities
         for (int z = chunkMin.getFloorY(); z < chunkMax.getFloorY(); z++) {
             ArrayList<Vector2d> rowChunks = new ArrayList<>();
+            ArrayList<Vector2d> rowSets = new ArrayList<>();
             for (Vector2d chunkId : ownedChunks.keySet()) {
                 if (chunkId.getFloorY() != z) continue;
                 rowChunks.add(chunkId);
+            }
+
+            for (Vector2d rowChunk : rowChunks) {
+                if (rowChunks.contains(rowChunk.add(1, 0))) {
+                    continue;
+                }
+
+                rowSets.add(rowChunk);
             }
 
             Log.info("Row chunks has " + rowChunks.size());
@@ -116,5 +125,22 @@ public class ZonedShape extends ShapeMarker {
             buildInterior(startingId.add(0, 1)); //S
             buildInterior(startingId.sub(0, 1)); //N
         }
+    }
+
+    private boolean isAdjacent(Vector2d lastChunkId, Vector2d testId) {
+        //Check E, W, S, N (in order) for immediate or diagonal adjacency
+        int prevX = lastChunkId.getFloorX();
+        int prevZ = lastChunkId.getFloorY();
+        int testX = testId.getFloorX();
+        int testZ = testId.getFloorY();
+
+        return (testX + 1 == prevX && testZ == prevZ) ||    //E
+                (testX - 1 == prevX && testZ == prevZ) ||   //W
+                (testX == prevX && testZ + 1 == prevZ) ||   //S
+                (testX == prevX && testZ - 1 == prevZ) ||   //N
+                (testX + 1 == prevX && testZ + 1 == prevZ) ||   //SE
+                (testX + 1 == prevX && testZ - 1 == prevZ) ||   //NE
+                (testX - 1 == prevX && testZ + 1 == prevZ) ||   //SW
+                (testX - 1 == prevX && testZ - 1 == prevZ); //NW
     }
 }
