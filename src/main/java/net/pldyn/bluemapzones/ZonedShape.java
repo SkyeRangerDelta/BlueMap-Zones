@@ -79,7 +79,7 @@ public class ZonedShape extends ShapeMarker {
         Vector2d startingId = null;
 
         //Target "inside" chunk - find *all* inside chunk possibilities
-        for (int z = chunkMin.getFloorY(); z < chunkMax.getFloorY(); z++) {
+        for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
             ArrayList<Vector2d> rowChunks = new ArrayList<>();
             ArrayList<Vector2d> rowSets = new ArrayList<>();
             for (Vector2d chunkId : ownedChunks.keySet()) {
@@ -96,8 +96,8 @@ public class ZonedShape extends ShapeMarker {
             }
 
             Log.info("Row chunks has " + rowChunks.size());
-            if (rowChunks.size() == 2) {
-                startingId = rowChunks.get(0).add(1, 0);
+            if (rowSets.size() == 2) {
+                startingId = rowSets.get(0).add(1, 0);
                 break;
             }
         }
