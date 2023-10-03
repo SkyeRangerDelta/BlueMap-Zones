@@ -78,32 +78,34 @@ public class ZonedShape extends ShapeMarker {
         Log.info("Shape has maximum cell count of " + shapeMaxPossibleCellCount);
         Vector2d startingId = null;
 
-        //Target "inside" chunk - find *all* inside chunk possibilities
-        for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
-            ArrayList<Vector2d> rowChunks = new ArrayList<>();
-            ArrayList<Vector2d> rowSets = new ArrayList<>();
-            for (Vector2d chunkId : ownedChunks.keySet()) {
-                if (chunkId.getFloorY() != z) continue;
-                rowChunks.add(chunkId);
-            }
-
-            for (Vector2d rowChunk : rowChunks) {
-                if (rowChunks.contains(rowChunk.add(1, 0))) {
-                    continue;
+        for (int z1 = chunkMax.getFloorY(); z1 < chunkMax.getFloorY(); z1++) {
+            //Target "inside" chunk - find *all* inside chunk possibilities
+            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
+                ArrayList<Vector2d> rowChunks = new ArrayList<>();
+                ArrayList<Vector2d> rowSets = new ArrayList<>();
+                for (Vector2d chunkId : ownedChunks.keySet()) {
+                    if (chunkId.getFloorY() != z) continue;
+                    rowChunks.add(chunkId);
                 }
 
-                rowSets.add(rowChunk);
+                for (Vector2d rowChunk : rowChunks) {
+                    if (rowChunks.contains(rowChunk.add(1, 0))) {
+                        continue;
+                    }
+
+                    rowSets.add(rowChunk);
+                }
+
+                Log.info("Row chunks has " + rowChunks.size());
+                if (rowSets.size() == 2) {
+                    startingId = rowSets.get(0).add(1, 0);
+                    break;
+                }
             }
 
-            Log.info("Row chunks has " + rowChunks.size());
-            if (rowSets.size() == 2) {
-                startingId = rowSets.get(0).add(1, 0);
-                break;
-            }
+            Log.info("Found a starting ID at " + startingId);
+            buildInterior(startingId);
         }
-
-        Log.info("Found a starting ID at " + startingId);
-        buildInterior(startingId);
     }
 
     private void buildInterior(Vector2d startingId) {
