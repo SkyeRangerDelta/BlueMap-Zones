@@ -6,6 +6,7 @@ import de.bluecolored.bluemap.api.math.Shape;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class ZonedShape extends ShapeMarker {
@@ -71,41 +72,48 @@ public class ZonedShape extends ShapeMarker {
         Vector2d chunkMax = getMaxChunk();
         Vector2d chunkMin = getMinChunk();
 
-        int shapeLength = chunkMax.getFloorX() - chunkMin.getFloorX();
         int shapeHeight = chunkMax.getFloorY() - chunkMin.getFloorY();
-
-        int shapeMaxPossibleCellCount = shapeLength * shapeHeight;
-        Log.info("Shape has maximum cell count of " + shapeMaxPossibleCellCount);
         Vector2d startingId = null;
 
         for (int z1 = chunkMax.getFloorY(); z1 < chunkMax.getFloorY(); z1++) {
+            Log.info("Pass " + z1 + " of " + shapeHeight);
             //Target "inside" chunk - find *all* inside chunk possibilities
             for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
                 ArrayList<Vector2d> rowChunks = new ArrayList<>();
-                ArrayList<Vector2d> rowSets = new ArrayList<>();
                 for (Vector2d chunkId : ownedChunks.keySet()) {
                     if (chunkId.getFloorY() != z) continue;
                     rowChunks.add(chunkId);
                 }
 
-                for (Vector2d rowChunk : rowChunks) {
-                    if (rowChunks.contains(rowChunk.add(1, 0))) {
-                        continue;
-                    }
+                ArrayList<ArrayList<Vector2d>> rowSetData = findSets(rowChunks);
+                if (rowSetData.size() == 1) continue; //Single contiguous row
 
-                    rowSets.add(rowChunk);
-                }
-
-                Log.info("Row chunks has " + rowChunks.size());
-                if (rowSets.size() == 2) {
-                    startingId = rowSets.get(0).add(1, 0);
-                    break;
-                }
             }
 
             Log.info("Found a starting ID at " + startingId);
             buildInterior(startingId);
         }
+    }
+
+    private ArrayList<ArrayList<Vector2d>> findSets(ArrayList<Vector2d> rowChunks) {
+        ArrayList<ArrayList<Vector2d>> chunkSets = new ArrayList<>();
+        Vector2d prevId = null;
+        int i = 0;
+        for (Vector2d id : rowChunks) {
+            if (prevId == null || !isAdjacent(prevId, id)) {
+                chunkSets.add(new ArrayList<>());
+                chunkSets.get(i).add(id);
+                i++;
+            }
+            else {
+                chunkSets.get(i).add(id);
+            }
+
+            prevId = id;
+        }
+
+        Log.info("Z row has " + chunkSets.size() + " sets of chunks.");
+        return chunkSets;
     }
 
     private void buildInterior(Vector2d startingId) {
