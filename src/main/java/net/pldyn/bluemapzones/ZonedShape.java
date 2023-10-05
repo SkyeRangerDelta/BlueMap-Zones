@@ -69,14 +69,16 @@ public class ZonedShape extends ShapeMarker {
     }
 
     public void doInteriorGeneration() {
-        Vector2d chunkMax = getMaxChunk();
-        Vector2d chunkMin = getMinChunk();
 
-        int shapeHeight = chunkMax.getFloorY() - chunkMin.getFloorY();
+        Log.info("Starting interior generation on " + this.getLabel());
+
+        Vector2d chunkMax = this.getMaxChunk();
+        Vector2d chunkMin = this.getMinChunk();
+
         Vector2d startingId = null;
 
-        for (int z1 = chunkMax.getFloorY(); z1 < chunkMax.getFloorY(); z1++) {
-            Log.info("Pass " + z1 + " of " + shapeHeight);
+        for (int z1 = chunkMin.getFloorY() + 1; z1 < chunkMax.getFloorY() - 1; z1++) {
+            Log.info("Pass " + z1 + " to " + chunkMax.getFloorY());
             //Target "inside" chunk - find *all* inside chunk possibilities
             for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
                 ArrayList<Vector2d> rowChunks = new ArrayList<>();
@@ -85,9 +87,15 @@ public class ZonedShape extends ShapeMarker {
                     rowChunks.add(chunkId);
                 }
 
-                ArrayList<ArrayList<Vector2d>> rowSetData = findSets(rowChunks);
+                ArrayList<ArrayList<Vector2d>> rowSetData = this.findSets(rowChunks);
                 if (rowSetData.size() == 1) continue; //Single contiguous row
 
+                //Test for closed iterating to top/bottom?
+
+                //Assume two sets make the between an interior for now
+                if (rowSetData.size() == 2) {
+                    startingId = rowSetData.get(0).get(rowSetData.get(0).size() - 1).add(1, 0);
+                }
             }
 
             Log.info("Found a starting ID at " + startingId);
@@ -100,8 +108,14 @@ public class ZonedShape extends ShapeMarker {
         Vector2d prevId = null;
         int i = 0;
         for (Vector2d id : rowChunks) {
-            if (prevId == null || !isAdjacent(prevId, id)) {
+            try {
+                chunkSets.get(i);
+            }
+            catch (IndexOutOfBoundsException e) {
                 chunkSets.add(new ArrayList<>());
+            }
+
+            if (prevId == null || !isAdjacent(prevId, id)) {
                 chunkSets.get(i).add(id);
                 i++;
             }
@@ -112,7 +126,7 @@ public class ZonedShape extends ShapeMarker {
             prevId = id;
         }
 
-        Log.info("Z row has " + chunkSets.size() + " sets of chunks.");
+        Log.info("Z row has " + chunkSets);
         return chunkSets;
     }
 

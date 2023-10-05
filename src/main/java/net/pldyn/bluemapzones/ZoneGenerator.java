@@ -255,25 +255,8 @@ public class ZoneGenerator {
         return lineIds;
     }
 
-    /*
-        /\
-        | Z-
-        |
- X- <---*---> X+
-        |
-        | Z+
-        \/
-     */
-
     private void generateShapeInteriors() {
-        int shapeC = 1;
-        int cellC = 1;
-
-        //Algo for filling hollow space
         for (ZonedShape shape : zonedShapes) {
-            Log.info("Beginning shape interior build for shape " + shapeC + " of " + zonedShapes.size());
-            shapeC++;
-
             shape.doInteriorGeneration();
         }
     }
