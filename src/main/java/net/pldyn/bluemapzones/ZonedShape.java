@@ -5,6 +5,7 @@ import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
@@ -77,10 +78,11 @@ public class ZonedShape extends ShapeMarker {
 
         Vector2d startingId = null;
 
-        for (int z1 = chunkMin.getFloorY() + 1; z1 < chunkMax.getFloorY() - 1; z1++) {
-            Log.info("Pass " + z1 + " to " + chunkMax.getFloorY());
+        for (int z1 = chunkMin.getFloorY() + 1; z1 < chunkMax.getFloorY(); z1++) {
             //Target "inside" chunk - find *all* inside chunk possibilities
-            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY() - 1; z++) {
+            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY(); z++) {
+                int lv = z1 + 1;
+                Log.info("Pass " + lv + " of " + chunkMax.getFloorY() + " - Z level " + z);
                 ArrayList<Vector2d> rowChunks = new ArrayList<>();
                 for (Vector2d chunkId : ownedChunks.keySet()) {
                     if (chunkId.getFloorY() != z) continue;
@@ -88,7 +90,6 @@ public class ZonedShape extends ShapeMarker {
                 }
 
                 ArrayList<ArrayList<Vector2d>> rowSetData = this.findSets(rowChunks);
-                if (rowSetData.size() == 1) continue; //Single contiguous row
 
                 //Test for closed iterating to top/bottom?
 
@@ -105,6 +106,8 @@ public class ZonedShape extends ShapeMarker {
 
     private ArrayList<ArrayList<Vector2d>> findSets(ArrayList<Vector2d> rowChunks) {
         ArrayList<ArrayList<Vector2d>> chunkSets = new ArrayList<>();
+        Collections.sort(rowChunks); //Ensure ids are X-> increasing
+        Log.info("Row:" + rowChunks);
         Vector2d prevId = null;
         int i = 0;
         for (Vector2d id : rowChunks) {
@@ -115,18 +118,26 @@ public class ZonedShape extends ShapeMarker {
                 chunkSets.add(new ArrayList<>());
             }
 
-            if (prevId == null || !isAdjacent(prevId, id)) {
+            if ((prevId == null)) {
                 chunkSets.get(i).add(id);
+                Log.info("I set: " + chunkSets.get(i));
+                prevId = id;
+                continue;
+            }
+
+            if (!isAdjacent(prevId, id)) {
                 i++;
+                chunkSets.add(new ArrayList<>());
+                chunkSets.get(i).add(id);
             }
             else {
                 chunkSets.get(i).add(id);
+                Log.info("I set: " + chunkSets.get(i));
             }
 
             prevId = id;
         }
 
-        Log.info("Z row has " + chunkSets);
         return chunkSets;
     }
 
@@ -158,13 +169,6 @@ public class ZonedShape extends ShapeMarker {
         int testX = testId.getFloorX();
         int testZ = testId.getFloorY();
 
-        return (testX + 1 == prevX && testZ == prevZ) ||    //E
-                (testX - 1 == prevX && testZ == prevZ) ||   //W
-                (testX == prevX && testZ + 1 == prevZ) ||   //S
-                (testX == prevX && testZ - 1 == prevZ) ||   //N
-                (testX + 1 == prevX && testZ + 1 == prevZ) ||   //SE
-                (testX + 1 == prevX && testZ - 1 == prevZ) ||   //NE
-                (testX - 1 == prevX && testZ + 1 == prevZ) ||   //SW
-                (testX - 1 == prevX && testZ - 1 == prevZ); //NW
+        return (testX + 1 == prevX && testZ == prevZ) || (testX - 1 == prevX && testZ == prevZ);
     }
 }
