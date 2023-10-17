@@ -77,6 +77,7 @@ public class ZonedShape extends ShapeMarker {
         Vector2d chunkMin = this.getMinChunk();
 
         Vector2d startingId = null;
+        boolean ranInterior = false;
 
         for (int z1 = chunkMin.getFloorY() + 1; z1 < chunkMax.getFloorY(); z1++) {
             //Target "inside" chunk - find *all* inside chunk possibilities
@@ -100,14 +101,18 @@ public class ZonedShape extends ShapeMarker {
             }
 
             Log.info("Found a starting ID at " + startingId);
-            buildInterior(startingId);
+            if (startingId != null) {
+                buildInterior(startingId);
+                ranInterior = true;
+            }
+
+            if (!ranInterior) break;
         }
     }
 
     private ArrayList<ArrayList<Vector2d>> findSets(ArrayList<Vector2d> rowChunks) {
         ArrayList<ArrayList<Vector2d>> chunkSets = new ArrayList<>();
         Collections.sort(rowChunks); //Ensure ids are X-> increasing
-        Log.info("Row:" + rowChunks);
         Vector2d prevId = null;
         int i = 0;
         for (Vector2d id : rowChunks) {
@@ -120,7 +125,6 @@ public class ZonedShape extends ShapeMarker {
 
             if ((prevId == null)) {
                 chunkSets.get(i).add(id);
-                Log.info("I set: " + chunkSets.get(i));
                 prevId = id;
                 continue;
             }
@@ -132,7 +136,6 @@ public class ZonedShape extends ShapeMarker {
             }
             else {
                 chunkSets.get(i).add(id);
-                Log.info("I set: " + chunkSets.get(i));
             }
 
             prevId = id;
@@ -149,11 +152,11 @@ public class ZonedShape extends ShapeMarker {
             (startingId.getFloorY() < minChunk.getFloorY())) return;
 
         if (!ownedChunks.containsKey(startingId)) {
-            Log.info("Running interior build on chunk (" + startingId.getFloorX() +
-                    ", " + startingId.getFloorY() + ")");
             ZonedChunk newChunk = new ZonedChunk(startingId);
             newChunk.addOwner(this);
             ownedChunks.put(startingId, newChunk);
+
+            //Use array iterative approach
 
             buildInterior(startingId.add(1, 0)); //E
             buildInterior(startingId.sub(1, 0)); //W
