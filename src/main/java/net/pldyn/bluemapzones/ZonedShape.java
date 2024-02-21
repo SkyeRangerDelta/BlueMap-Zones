@@ -3,11 +3,9 @@ package net.pldyn.bluemapzones;
 import com.flowpowered.math.vector.Vector2d;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
+import it.unimi.dsi.fastutil.Hash;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class ZonedShape extends ShapeMarker {
@@ -17,6 +15,12 @@ public class ZonedShape extends ShapeMarker {
     public Vector2d maxChunk = getMaxChunk();
     public Vector2d minChunk = getMinChunk();
 
+    /**
+     * Constructor for a ZonedShape.
+     * @param label The label of the shape.
+     * @param shape The BlueMap shape type of the zone.
+     * @param shapeY The Y level of the shape.
+     */
     public ZonedShape(String label, Shape shape, float shapeY) {
         super(label, shape, shapeY);
         Log.info("Created a new zone shape.");
@@ -42,6 +46,10 @@ public class ZonedShape extends ShapeMarker {
         return ownedChunks.containsValue(ownedChunk);
     }
 
+    /**
+     * Determines the maximum chunk ID (SE) of the zone shape.
+     * @return The maximum chunk ID of the zone shape.
+     */
     public Vector2d getMaxChunk() {
         Vector2d max = this.getShape().getMax();
 
@@ -51,6 +59,10 @@ public class ZonedShape extends ShapeMarker {
         return new Vector2d(maxX, maxZ);
     }
 
+    /**
+     * Determines the minimum chunk ID (NW) of the zone shape.
+     * @return The minimum chunk ID of the zone shape.
+     */
     public Vector2d getMinChunk() {
         Vector2d min = this.getShape().getMin();
 
@@ -60,6 +72,10 @@ public class ZonedShape extends ShapeMarker {
         return new Vector2d(minX, minZ);
     }
 
+    /**
+     * Finds all the chunks in a zone that have more than one owner.
+     * @return A HashMap of Vector2d to ZonedChunk, of all conflicted chunks.
+     */
     public HashMap<Vector2d, ZonedChunk> getConflictedChunks() {
         HashMap<Vector2d, ZonedChunk> conflictedChunks = new HashMap<>();
         for (ZonedChunk chunk : ownedChunks.values()) {
@@ -69,6 +85,9 @@ public class ZonedShape extends ShapeMarker {
         return conflictedChunks;
     }
 
+    /**
+     * Generates the interior of the zone shape.
+     */
     public void doInteriorGeneration() {
 
         Log.info("Starting interior generation on " + this.getLabel());
@@ -76,40 +95,29 @@ public class ZonedShape extends ShapeMarker {
         Vector2d chunkMax = this.getMaxChunk();
         Vector2d chunkMin = this.getMinChunk();
 
+        //Determine sectors of the zone (8x8 set of chunks)
+        int zoneWidth = chunkMax.getFloorX() - chunkMin.getFloorX();
+        int zoneHeight = chunkMax.getFloorY() - chunkMin.getFloorY();
+
+        int sectorWidth = Math.floorDiv(zoneWidth, 8); //Sector count width
+        int sectorHeight = Math.floorDiv(zoneHeight, 8); //Sector count height
+
         Vector2d startingId = null;
         boolean ranInterior = false;
 
-        for (int z1 = chunkMin.getFloorY() + 1; z1 < chunkMax.getFloorY(); z1++) {
-            //Target "inside" chunk - find *all* inside chunk possibilities
-            for (int z = chunkMin.getFloorY() + 1; z < chunkMax.getFloorY(); z++) {
-                int lv = z1 + 1;
-                Log.info("Pass " + lv + " of " + chunkMax.getFloorY() + " - Z level " + z);
-                ArrayList<Vector2d> rowChunks = new ArrayList<>();
-                for (Vector2d chunkId : ownedChunks.keySet()) {
-                    if (chunkId.getFloorY() != z) continue;
-                    rowChunks.add(chunkId);
-                }
-
-                ArrayList<ArrayList<Vector2d>> rowSetData = this.findSets(rowChunks);
-
-                //Test for closed iterating to top/bottom?
-
-                //Assume two sets make the between an interior for now
-                if (rowSetData.size() == 2) {
-                    startingId = rowSetData.get(0).get(rowSetData.get(0).size() - 1).add(1, 0);
-                }
+        //Run through each sector and recursively fill in the interior
+        for (int sW = 0; sW < sectorWidth; sW++) { //Each sector across
+            for (int sH = 0; sH < sectorHeight; sH++) {
+                //Find a suitable 'interior' chunk to start from
             }
-
-            Log.info("Found a starting ID at " + startingId);
-            if (startingId != null) {
-                buildInterior(startingId);
-                ranInterior = true;
-            }
-
-            if (!ranInterior) break;
         }
     }
 
+    /**
+     * Finds sets of chunks in a row from the same zone.
+     * @param rowChunks The chunks to find sets in.
+     * @return An ArrayList of ArrayLists of Vector2d, each inner ArrayList being a set of chunks.
+     */
     private ArrayList<ArrayList<Vector2d>> findSets(ArrayList<Vector2d> rowChunks) {
         ArrayList<ArrayList<Vector2d>> chunkSets = new ArrayList<>();
         Collections.sort(rowChunks); //Ensure ids are X-> increasing
@@ -144,27 +152,43 @@ public class ZonedShape extends ShapeMarker {
         return chunkSets;
     }
 
+    /**
+     * Recursive method to build the interior of a zone shape.
+     * @param startingId The starting chunk ID to build from.
+     */
     private void buildInterior(Vector2d startingId) {
-        if (startingId == null) return;
-        if ((startingId.getFloorX() > maxChunk.getFloorX()) ||
-            (startingId.getFloorX() < minChunk.getFloorX()) ||
-            (startingId.getFloorY() > maxChunk.getFloorY()) ||
-            (startingId.getFloorY() < minChunk.getFloorY())) return;
+        Log.info("Starting interior build.");
+        int queueSize = 1;
+        Queue<Vector2d> chunkQueue = new LinkedList<>();
+        chunkQueue.add(startingId);
 
-        if (!ownedChunks.containsKey(startingId)) {
-            ZonedChunk newChunk = new ZonedChunk(startingId);
+        while (!chunkQueue.isEmpty()) {
+
+            queueSize++;
+            Vector2d currentId = chunkQueue.poll();
+
+            if (ownedChunks.containsKey(currentId)) {
+                continue;
+            };
+
+            Log.info("Adding chunk " + currentId + " to zone " + this.getLabel() + " interior.");
+
+            ZonedChunk newChunk = new ZonedChunk(currentId);
             newChunk.addOwner(this);
-            ownedChunks.put(startingId, newChunk);
+            ownedChunks.put(currentId, newChunk);
 
-            //Use array iterative approach
-
-            buildInterior(startingId.add(1, 0)); //E
-            buildInterior(startingId.sub(1, 0)); //W
-            buildInterior(startingId.add(0, 1)); //S
-            buildInterior(startingId.sub(0, 1)); //N
+            //Add valid adjacent chunks to the queue
         }
+
+        Log.info("Finished with interior size " + queueSize + " chunks.");
     }
 
+    /**
+     * Determines if the testId is adjacent to the lastChunkId.
+     * @param lastChunkId The last chunk ID to compare against.
+     * @param testId The chunk ID to test.
+     * @return True if the testId is adjacent to the lastChunkId, false otherwise.
+     */
     private boolean isAdjacent(Vector2d lastChunkId, Vector2d testId) {
         //Check E, W, S, N (in order) for immediate or diagonal adjacency
         int prevX = lastChunkId.getFloorX();
@@ -173,5 +197,23 @@ public class ZonedShape extends ShapeMarker {
         int testZ = testId.getFloorY();
 
         return (testX + 1 == prevX && testZ == prevZ) || (testX - 1 == prevX && testZ == prevZ);
+    }
+
+    private boolean isValidSurrounding(Vector2d testChunk) {
+        boolean valid = false;
+        boolean isOwned = ownedChunks.containsKey(testChunk);
+
+        int[][] directions = {
+                {1, 0},
+                {-1, 0},
+                {0, 1},
+                {0, -1},
+                {-1, -1},
+                {-1, 1},
+                {1, -1},
+                {1, 1}
+        };
+
+        return (valid && isOwned);
     }
 }

@@ -1,0 +1,26 @@
+name: BlueMap-Zones
+version: '${version}'
+main: net.pldyn.bluemapzones.BlueMap_Zones
+api-version: '1.20'
+prefix: [BM-Zones]
+authors: [SkyeRangerDelta]
+description: "A BlueMap addon featuring per-marker events."
+website: https://pldyn.net/
+depend:
+  - BlueMap
+has-open-classloader: true
+commands:
+  generate:
+    description: "Generate the zones for BlueMap"
+    usage: "/generate"
+    permission: bluemapzones.generate
+    permission-message: "You do not have permission to use this command."
+    aliases: gz
+permissions:
+  bluemapzones.*:
+    description: "Grants access to all BlueMap-Zones commands"
+    children:
+      bluemapzones.generate: true
+  bluemapzones.generate:
+    description: "Allows the player to generate the zones for BlueMap"
+    default: op

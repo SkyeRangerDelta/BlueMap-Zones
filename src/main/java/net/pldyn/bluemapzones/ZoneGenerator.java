@@ -11,33 +11,13 @@ import de.bluecolored.bluemap.api.math.Shape;
 import java.util.*;
 import java.util.logging.Logger;
 
-public class ZoneGenerator {
+public class ZoneGenerator extends Thread {
     private static final Logger Log = Logger.getLogger("BM Zones");
     private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
-    public ZoneGenerator(BlueMapAPI blueMapAPI) {
-        Log.info("API loaded.");
-        BlueMapMap workingMap = findConfMaps(blueMapAPI.getMaps());
-
-        if (workingMap == null) {
-            Log.warning("Couldn't find the map to load!");
-            return;
-        }
-
-        MarkerSet objectiveSet = findMarkerSets(workingMap);
-        if (objectiveSet == null) {
-            Log.warning("Couldn't find the marker set to load!");
-            return;
-        }
-
-        //Build shapes and their bounds
-        handleMarkerSet(objectiveSet);
-
-        //Build shape interiors
-        generateShapeInteriors();
-    }
-
-    public ArrayList<ZonedShape> getZonedShapes() {
-        return zonedShapes;
+    private final BlueMapAPI blueMapAPI;
+    private final BlueMap_Zones plugin = BlueMap_Zones.getInstance();
+    public ZoneGenerator(BlueMapAPI blueMapApi) {
+        this.blueMapAPI = blueMapApi;
     }
 
     private BlueMapMap findConfMaps(Collection<BlueMapMap> loadedWorlds) {
@@ -271,5 +251,32 @@ public class ZoneGenerator {
         }
 
         return conflictedOwners;
+    }
+
+    public void run() {
+        Log.info("Starting child thread generator.");
+
+        Log.info("API loaded.");
+        BlueMapMap workingMap = findConfMaps(blueMapAPI.getMaps());
+
+        if (workingMap == null) {
+            Log.warning("Couldn't find the map to load!");
+            return;
+        }
+
+        MarkerSet objectiveSet = findMarkerSets(workingMap);
+        if (objectiveSet == null) {
+            Log.warning("Couldn't find the marker set to load!");
+            return;
+        }
+
+        //Build shapes and their bounds
+        handleMarkerSet(objectiveSet);
+
+        //Build shape interiors
+        generateShapeInteriors();
+
+        plugin.setZonedShapes(zonedShapes);
+        plugin.setGenerating(false);
     }
 }
