@@ -5,6 +5,7 @@ import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
 import it.unimi.dsi.fastutil.Hash;
 
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -102,15 +103,40 @@ public class ZonedShape extends ShapeMarker {
         int sectorWidth = Math.floorDiv(zoneWidth, 8); //Sector count width
         int sectorHeight = Math.floorDiv(zoneHeight, 8); //Sector count height
 
-        Vector2d startingId = null;
+        Vector2d startingId = findRootSeedChunk();
         boolean ranInterior = false;
 
-        //Run through each sector and recursively fill in the interior
-        for (int sW = 0; sW < sectorWidth; sW++) { //Each sector across
-            for (int sH = 0; sH < sectorHeight; sH++) {
-                //Find a suitable 'interior' chunk to start from
+        //We have a grid of sectors to work with, start in the sector with the seed and work through them
+    }
+
+    /**
+     * Finds the root seed chunk for interior generation.
+     * @return The root seed chunk for interior generation.
+     */
+    private Vector2d findRootSeedChunk() {
+        Vector2d seedChunk = null;
+
+        for (Vector2d chunkId : ownedChunks.keySet()) {
+            ArrayList<Vector2d> zChunks = new ArrayList<>();
+            for (Vector2d zChunk : ownedChunks.keySet()) {
+                if (chunkId.getFloorY() != zChunk.getFloorY()) continue;
+                zChunks.add(zChunk);
+            }
+
+            ArrayList<ArrayList<Vector2d>> chunkSets = findSets(zChunks);
+
+            if (chunkSets.size() == 2) {
+                ArrayList<Vector2d> firstSet = chunkSets.get(0);
+                seedChunk = firstSet.get(firstSet.size() - 1).add(1, 0);
+                break;
             }
         }
+
+        if (seedChunk == null) {
+            Log.info("No suitable seed chunk found for zone " + this.getLabel() + " interior generation.");
+        }
+
+        return seedChunk;
     }
 
     /**
