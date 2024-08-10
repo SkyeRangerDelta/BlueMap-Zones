@@ -2,6 +2,7 @@ package net.pldyn.bluemapzones;
 
 import de.bluecolored.bluemap.api.BlueMapAPI;
 import net.pldyn.bluemapzones.commands.generateCommand;
+import net.pldyn.bluemapzones.commands.toggleNoticeCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
@@ -24,7 +25,7 @@ public final class BlueMap_Zones extends JavaPlugin {
     BMZ = this;
 
     ConfigHandler.confInit();
-    ConfigHandler.createDefaults();
+    ConfigHandler.createPluginDefaults();
 
     Log.info("Plugin enabled!");
     BlueMapAPI.onEnable(blueMapApi -> {
@@ -46,6 +47,7 @@ public final class BlueMap_Zones extends JavaPlugin {
     toolHandler = new ToolHandler(zonedShapes);
 
     Objects.requireNonNull(getCommand("generate")).setExecutor(new generateCommand());
+    Objects.requireNonNull(getCommand("toggle-titles")).setExecutor(new toggleNoticeCommand());
 
     getServer().getPluginManager().registerEvents(movementHandler, this);
     getServer().getPluginManager().registerEvents(toolHandler, this);

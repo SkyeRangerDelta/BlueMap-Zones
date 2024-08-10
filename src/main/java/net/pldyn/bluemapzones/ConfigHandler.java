@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 public class ConfigHandler {
@@ -93,12 +94,15 @@ public class ConfigHandler {
   }
 
   /**
-   * @method createDefaults - Create default values for the plugin configuration.
+   * @method createPluginDefaults - Create default values for the plugin configuration.
    */
-  public static void createDefaults() {
+  public static void createPluginDefaults() {
     pluginConfFile.addDefault("Maps.name", "world");
     pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
     savePluginConfFile();
+
+    noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<>());
+    saveNoticeExclusionsConf();
   }
 
   /**
@@ -137,5 +141,40 @@ public class ConfigHandler {
    */
   public static void reloadPluginConfgFile() {
     loadConfig();
+  }
+
+  /**
+   * @method addNoticeExclusion - Add a UUID to the notice exclusions list.
+   * @param uuid
+   */
+  public static void addNoticeExclusion(UUID uuid) {
+    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
+    exclusions.add(uuid.toString());
+    noticeExclusionsConfFile.set("Exclusions", exclusions);
+    saveNoticeExclusionsConf();
+  }
+
+  /**
+   * @method removeNoticeExclusion - Remove a UUID from the notice exclusions list.
+   * @param uuid
+   */
+  public static void removeNoticeExclusion(UUID uuid) {
+    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
+    exclusions.remove(uuid.toString());
+    noticeExclusionsConfFile.set("Exclusions", exclusions);
+    saveNoticeExclusionsConf();
+  }
+
+  /**
+   * @method getNoticeExclusions - Get the list of UUIDs to exclude from notices.
+   * @return {List<UUID>}
+   */
+  public static List<UUID> getNoticeExclusions() {
+    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
+    List<UUID> uuidList = new ArrayList<>();
+    for (String exclusion : exclusions) {
+      uuidList.add(UUID.fromString(exclusion));
+    }
+    return uuidList;
   }
 }
