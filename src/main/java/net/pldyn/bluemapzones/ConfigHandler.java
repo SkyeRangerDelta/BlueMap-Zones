@@ -9,54 +9,54 @@ import java.io.IOException;
 import java.util.logging.Logger;
 
 public class ConfigHandler {
-    private static final Logger Log = Logger.getLogger("BM Zones");
-    private static File confFile;
-    private static FileConfiguration pluginConfFile;
+  private static final Logger Log = Logger.getLogger("BM Zones");
+  private static File confFile;
+  private static FileConfiguration pluginConfFile;
 
-    public static void confInit() {
-        fileInit();
-        pluginConfFile.options().copyDefaults(true);
-        savePluginConfFile();
+  public static void confInit() {
+    filesInit();
+    pluginConfFile.options().copyDefaults(true);
+    savePluginConfFile();
+  }
+
+  private static void filesInit() {
+    confFile = new File(
+      Bukkit.getPluginManager()
+        .getPlugin("BlueMap-Zones")
+        .getDataFolder(), "BMZ-Config.yml");
+
+    if (!confFile.exists()) {
+      try {
+        confFile.createNewFile();
+      }
+      catch (IOException fileCreationErr) {
+        Log.warning("Unable to create a config file on the server!\n" + fileCreationErr.getMessage());
+      }
     }
 
-    private static void fileInit() {
-        confFile = new File(
-                Bukkit.getPluginManager()
-                        .getPlugin("BlueMap-Zones")
-                        .getDataFolder(), "BM-ZonesConfig.yml");
+    pluginConfFile = YamlConfiguration.loadConfiguration(confFile);
+  }
 
-        if (!confFile.exists()) {
-            try {
-                confFile.createNewFile();
-            }
-            catch (IOException fileCreationErr) {
-                Log.warning("Unable to create a config file on the server!\n" + fileCreationErr.getMessage());
-            }
-        }
+  public static void createDefaults() {
+    pluginConfFile.addDefault("Maps.name", "world");
+    pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
+    savePluginConfFile();
+  }
 
-        pluginConfFile = YamlConfiguration.loadConfiguration(confFile);
+  public static FileConfiguration getPluginConfFile() {
+    return pluginConfFile;
+  }
+
+  public static void savePluginConfFile() {
+    try {
+      pluginConfFile.save(confFile);
     }
-
-    public static void createDefaults() {
-        pluginConfFile.addDefault("Maps.name", "world");
-        pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
-        savePluginConfFile();
+    catch (IOException fileSaveErr) {
+      Log.warning("Unable to save the plugin configuration!");
     }
+  }
 
-    public static FileConfiguration getPluginConfFile() {
-        return pluginConfFile;
-    }
-
-    public static void savePluginConfFile() {
-        try {
-            pluginConfFile.save(confFile);
-        }
-        catch (IOException fileSaveErr) {
-            Log.warning("Unable to save the plugin configuration!");
-        }
-    }
-
-    public static void reloadPluginConfgFile() {
-        pluginConfFile = YamlConfiguration.loadConfiguration(confFile);
-    }
+  public static void reloadPluginConfgFile() {
+    pluginConfFile = YamlConfiguration.loadConfiguration(confFile);
+  }
 }
