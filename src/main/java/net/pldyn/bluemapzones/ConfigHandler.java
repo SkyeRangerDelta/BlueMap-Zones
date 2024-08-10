@@ -139,7 +139,7 @@ public class ConfigHandler {
   /**
    * @method reloadPluginConfgFile - Reload the plugin configuration files.
    */
-  public static void reloadPluginConfgFile() {
+  public static void reloadPluginConfigFile() {
     loadConfig();
   }
 
