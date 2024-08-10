@@ -10,12 +10,14 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.logging.Logger;
 
-public final class BlueMap_Zones extends JavaPlugin {
+public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCallback {
 
   private static final Logger Log = Logger.getLogger("BM Zones");
   private java.util.UUID UUID;
+
   public MovementHandler movementHandler;
   public ToolHandler toolHandler;
+
   private ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private BlueMapAPI bma;
   private static BlueMap_Zones BMZ;
@@ -47,21 +49,45 @@ public final class BlueMap_Zones extends JavaPlugin {
     movementHandler = new MovementHandler(zonedShapes);
     toolHandler = new ToolHandler(zonedShapes);
 
-    Objects.requireNonNull(getCommand("generate")).setExecutor(new generateCommand());
-    Objects.requireNonNull(getCommand("toggle-titles")).setExecutor(new toggleNoticeCommand());
-    Objects.requireNonNull(getCommand("reload-config")).setExecutor(new reloadConfCommand());
+    Objects.requireNonNull(
+        getCommand( "bmz-generate" ) )
+        .setExecutor( new generateCommand() );
+
+    Objects.requireNonNull(
+            getCommand( "bmz-toggle-notices" ) )
+        .setExecutor( new toggleNoticeCommand() );
+
+    Objects.requireNonNull(
+            getCommand( "bmz-reload-conf" ) )
+        .setExecutor( new reloadConfCommand() );
 
     getServer().getPluginManager().registerEvents(movementHandler, this);
     getServer().getPluginManager().registerEvents(toolHandler, this);
+
+    generateZones();
+
+    Log.info("Plugin initialized!");
   }
 
-  public void generateZones(BlueMapAPI blueMapAPI) {
+  @Override
+  public void onZoneGenerationComplete(ArrayList<ZonedShape> zonedShapes) {
+    runningGeneration = false;
+    setZonedShapes(zonedShapes);
+    Log.info("Zone generation complete!");
+    Log.info("Generated " + zonedShapes.size() + " zones.");
+
+    movementHandler.setZonedShapes( zonedShapes );
+  }
+
+  public void generateZones() {
     runningGeneration = true;
-    new ZoneGenerator(blueMapAPI).start();
+    new ZoneGenerator(bma, this, this).start();
+    Log.info("Zone generation started!");
   }
 
   public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
-      this.zonedShapes = zonedShapes;
+    this.zonedShapes.clear();
+    this.zonedShapes = zonedShapes;
   }
 
   public BlueMapAPI getBlueMapAPI() {

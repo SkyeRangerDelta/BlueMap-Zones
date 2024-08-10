@@ -1,8 +1,8 @@
 name: BlueMap-Zones
 version: '${version}'
 main: net.pldyn.bluemapzones.BlueMap_Zones
-api-version: '1.20'
-prefix: [BM-Zones]
+api-version: '1.21'
+prefix: 'bmz'
 authors: [SkyeRangerDelta]
 description: "A BlueMap addon featuring per-marker events."
 website: https://pldyn.net/
@@ -10,17 +10,37 @@ depend:
   - BlueMap
 has-open-classloader: true
 commands:
-  generate:
-    description: "Generate the zones for BlueMap"
-    usage: "/generate"
-    permission: bluemapzones.generate
-    permission-message: "You do not have permission to use this command."
-    aliases: gz
+  bmz-generate:
+    description: "Generates the zones for BlueMap"
+    usage: "/bmz-generate"
+    permission: "bluemapzones.generate"
+    aliases:
+      - bmz-gen
+  bmz-toggle-notices:
+    description: "Toggles zone change notices for your client."
+    usage: "/bmz-toggle-notices"
+    permission: "bluemapzones.toggle-notices"
+    aliases:
+      - bmz-tn
+  bmz-reload-conf:
+    description: "Reloads the plugin configuration."
+    usage: "/bmz-reload-conf"
+    permission: "bluemapzones.reload"
+    aliases:
+      - bmz-rc
 permissions:
   bluemapzones.*:
     description: "Grants access to all BlueMap-Zones commands"
     children:
       bluemapzones.generate: true
+      bluemapzones.toggle-notices: true
+      bluemapzones.reload: true
   bluemapzones.generate:
     description: "Allows the player to generate the zones for BlueMap"
+    default: op
+  bluemapzones.toggle-notices:
+    description: "Allows the player to toggle zone change notices for their client."
+    default: op
+  bluemapzones.reload:
+    description: "Allows the player to reload the plugin configuration."
     default: op

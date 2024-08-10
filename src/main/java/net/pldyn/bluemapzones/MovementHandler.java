@@ -13,7 +13,11 @@ import org.bukkit.event.player.PlayerMoveEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
+
+import static net.pldyn.bluemapzones.ConfigHandler.getNoticeExclusions;
 
 public class MovementHandler implements Listener {
 
@@ -29,6 +33,8 @@ public class MovementHandler implements Listener {
   public void onPlayerMove(PlayerMoveEvent e) {
     if (!e.hasChangedBlock()) return;
 
+    String worldName = (String) ConfigHandler.getPluginConfFile().get("Maps.name");
+
     Player pc = e.getPlayer();
     Location oldLocation = e.getFrom();
     Location newLocation = e.getTo();
@@ -37,6 +43,7 @@ public class MovementHandler implements Listener {
         Math.floorDiv(newLocation.getBlockZ(), 16));
 
     if (!hasChangedChunks(oldLocation, newLocation)) return;
+    if (!newLocation.getWorld().getName().equals(worldName)) return;
 
     isNewZone(pc, newChunkId);
   }
@@ -93,6 +100,9 @@ public class MovementHandler implements Listener {
     );
 
     Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
+
+    List<UUID> exclusionsList = getNoticeExclusions();
+    if (exclusionsList.contains(pc.getUniqueId())) return;
 
     pc.showTitle(newAreaTitle);
     pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);

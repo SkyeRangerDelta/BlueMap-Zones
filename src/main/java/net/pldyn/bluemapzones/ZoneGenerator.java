@@ -7,6 +7,7 @@ import de.bluecolored.bluemap.api.markers.Marker;
 import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
+import org.bukkit.Bukkit;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -15,9 +16,13 @@ public class ZoneGenerator extends Thread {
   private static final Logger Log = Logger.getLogger("BM Zones");
   private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private final BlueMapAPI blueMapAPI;
-  private final BlueMap_Zones plugin = BlueMap_Zones.getInstance();
-  public ZoneGenerator(BlueMapAPI blueMapApi) {
+  private final BlueMap_Zones plugin;
+  private final ZoneGenerationCallback callback;
+
+  public ZoneGenerator(BlueMapAPI blueMapApi, BlueMap_Zones plugin, ZoneGenerationCallback callback) {
     this.blueMapAPI = blueMapApi;
+    this.plugin = plugin;
+    this.callback = callback;
   }
 
   private BlueMapMap findConfMaps(Collection<BlueMapMap> loadedWorlds) {
@@ -253,6 +258,13 @@ public class ZoneGenerator extends Thread {
     return conflictedOwners;
   }
 
+  private void handleDataOnMainThread() {
+    Bukkit.getScheduler().runTask(plugin, () -> {
+//      plugin.setZonedShapes(zonedShapes);
+      plugin.setGenerating(false);
+    });
+  }
+
   public void run() {
     Log.info("Starting child thread generator.");
 
@@ -276,7 +288,18 @@ public class ZoneGenerator extends Thread {
     //Build shape interiors
     generateShapeInteriors();
 
-    plugin.setZonedShapes(zonedShapes);
-    plugin.setGenerating(false);
+    // Handle data on main thread
+    handleDataOnMainThread();
+
+    // Get the number of processed chunks
+    int chunkCount = 0;
+    for (ZonedShape shape : zonedShapes) {
+      chunkCount += shape.getOwnedChunks().size();
+    }
+
+    Log.info("Generation complete.\nGeneration includes " + zonedShapes.size() + " shapes with a total of "
+        + chunkCount + " chunks.");
+
+    callback.onZoneGenerationComplete( zonedShapes );
   }
 }
