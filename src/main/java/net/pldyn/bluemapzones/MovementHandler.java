@@ -105,7 +105,7 @@ public class MovementHandler implements Listener {
         printNewLocation(pc, WILDERNESS, false, chunkId);
       }
       else { // Inside a detected zone, therefore not a border - must be interior
-        Log.info( "Zone: " + zone.getLabel() );
+//        Log.info( "Zone: " + zone.getLabel() );
         if (pcLastZone.equals(zone.getLabel())) return;
         pcHistory.setLastAreaName(zone.getLabel());
 
@@ -219,7 +219,7 @@ public class MovementHandler implements Listener {
     ArrayList< ZonedShape > zones = new ArrayList<>();
     HashMap< ZonedShape, Integer > zoneCount = new HashMap<>();
 
-    Log.info( "Casting ray in all directions from " + playerLocation );
+//    Log.info( "Casting ray in all directions from " + playerLocation );
 
     // Define the directions
     Vector2d[] directions = {
@@ -231,7 +231,7 @@ public class MovementHandler implements Listener {
 
     for ( Vector2d direction : directions ) {
       Vector2d endPoint = playerLocation.add( direction.mul( 250 ) );
-      Log.info( "Casting ray to " + endPoint );
+//      Log.info( "Casting ray to " + endPoint );
       ArrayList< Vector2d > rayCastResult = runBresenham( playerLocation, endPoint );
 
       for ( Vector2d chunkId : rayCastResult ) {
@@ -271,7 +271,7 @@ public class MovementHandler implements Listener {
         Component.text(buildSubtitle(chunkName))
     );
 
-    Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
+//    Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
 
     List<UUID> exclusionsList = getNoticeExclusions();
     if (exclusionsList.contains(pc.getUniqueId())) return;

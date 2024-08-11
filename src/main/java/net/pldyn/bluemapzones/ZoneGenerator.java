@@ -40,7 +40,7 @@ public class ZoneGenerator extends Thread {
   private MarkerSet findMarkerSets(BlueMapMap world) {
     String markerID = (String) ConfigHandler.getPluginConfFile().get("Maps.marker-set");
     Map<String, MarkerSet> markerSets = world.getMarkerSets();
-    Log.info("World has " + markerSets.size() + " marker sets.");
+//    Log.info("World has " + markerSets.size() + " marker sets.");
 
     if (markerSets.isEmpty()) {
       Log.info("Map has no marker sets!");
@@ -60,7 +60,7 @@ public class ZoneGenerator extends Thread {
 
   private void handleMarkerSet(MarkerSet markerSet) {
     Map<String, Marker> setMarkers = markerSet.getMarkers();
-    Log.info("Cataloging " + setMarkers.size() + " markers.");
+//    Log.info("Cataloging " + setMarkers.size() + " markers.");
     int shapeCount = 0;
     for (Map.Entry<String, Marker> entry : setMarkers.entrySet()) {
       Log.info("Thinking about shape " + ++shapeCount + " of " + setMarkers.size());
@@ -77,8 +77,8 @@ public class ZoneGenerator extends Thread {
     Vector2d[] markerPoints = markerShape.getPoints();
     ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape, ((ShapeMarker) m).getShapeY());
 
-    Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
-        + " vertex point(s).");
+//    Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
+//        + " vertex point(s).");
 
     ZonedShape newZone2 = buildShapeBoundary(markerPoints, newZone);
 
@@ -153,12 +153,12 @@ public class ZoneGenerator extends Thread {
     newChunk.addOwner(newZone);
     newChunk.setBoundary(true);
 
-    if (newChunk.isConflicted()) {
-      Log.info("Adding conflicted chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
-    }
-    else {
-      Log.info("Adding chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
-    }
+//    if (newChunk.isConflicted()) {
+//      Log.info("Adding conflicted chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
+//    }
+//    else {
+//      Log.info("Adding chunk ID (" + chId.getFloorX() + ", " + chId.getFloorY() + ")");
+//    }
 
     return newChunk;
   }
@@ -232,7 +232,7 @@ public class ZoneGenerator extends Thread {
       //Testing coord
       Vector2d id = new Vector2d(workingX, workingZ);
       if (!lineIds.contains(id)) {
-        Log.info("Adding Bresenham ID (" + workingX + ", " + workingZ + ").");
+//        Log.info("Adding Bresenham ID (" + workingX + ", " + workingZ + ").");
         lineIds.add(id);
       }
     }
