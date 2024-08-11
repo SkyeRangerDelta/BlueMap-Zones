@@ -22,7 +22,7 @@ public class ZonedShape extends ShapeMarker {
    */
   public ZonedShape(String label, Shape shape, float shapeY) {
     super(label, shape, shapeY);
-    Log.info("Created a new zone shape.");
+//    Log.info("Created a new zone shape.");
   }
 
   public HashMap<Vector2d, ZonedChunk> getOwnedChunks() {

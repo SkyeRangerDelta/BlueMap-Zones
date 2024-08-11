@@ -22,6 +22,8 @@ public class ConfigHandler {
 
   private static final List<File> fileConfigurations = new ArrayList<>();
 
+  private static BlueMap_Zones BMZ = BlueMap_Zones.getInstance();
+
   /**
    * @method confInit - Initialize the configuration files for the plugin.
    */
@@ -97,12 +99,25 @@ public class ConfigHandler {
    * @method createPluginDefaults - Create default values for the plugin configuration.
    */
   public static void createPluginDefaults() {
+    List<String> headerComments = generateConfigComments();
+
+    pluginConfFile.options().setHeader( headerComments );
+
+    pluginConfFile.addDefault("Wilderness-Name", "Wilderness");
     pluginConfFile.addDefault("Maps.name", "world");
-    pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
+    pluginConfFile.addDefault("Maps.marker-sets", new ArrayList<String>());
     savePluginConfFile();
 
-    noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<>());
+    noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<String>());
     saveNoticeExclusionsConf();
+  }
+
+  /**
+   * @method getMarkerSets - Get the list of marker sets for the plugin.
+   * @return {List<String>}
+   */
+  public static List<String> getMarkerSets() {
+    return pluginConfFile.getStringList("Maps.marker-sets");
   }
 
   /**
@@ -141,6 +156,8 @@ public class ConfigHandler {
    */
   public static void reloadPluginConfigFile() {
     loadConfig();
+
+    BMZ.movementHandler.reloadConfig();
   }
 
   /**
@@ -176,5 +193,20 @@ public class ConfigHandler {
       uuidList.add(UUID.fromString(exclusion));
     }
     return uuidList;
+  }
+
+  /**
+   * @method generateConfigComments - Generate the comments for the plugin configuration file.
+   * @return {List<String>}
+   */
+  private static List<String> generateConfigComments() {
+    List< String > comments = new ArrayList<>();
+    comments.add( "BlueMap-Zones Configuration File" );
+    comments.add( "This file contains the configuration settings for the BlueMap-Zones plugin." );
+    comments.add( "Wilderness-Name: The title to appear when the player is outside all known marker areas." );
+    comments.add( "Maps: The list of maps to load and their marker sets." );
+    comments.add( "  name: The name of the map to load." );
+    comments.add( "  marker-sets: The list of marker sets to load for the map." );
+    return comments;
   }
 }
