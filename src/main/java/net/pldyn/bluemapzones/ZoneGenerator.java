@@ -297,7 +297,8 @@ public class ZoneGenerator extends Thread {
       chunkCount += shape.getOwnedChunks().size();
     }
 
-    Log.info("Generation complete.\nGeneration includes " + zonedShapes.size() + " shapes with a total of "
+    Log.info("Generation complete.");
+    Log.info("Generation includes " + zonedShapes.size() + " shapes with a total of "
         + chunkCount + " chunks.");
 
     callback.onZoneGenerationComplete( zonedShapes );

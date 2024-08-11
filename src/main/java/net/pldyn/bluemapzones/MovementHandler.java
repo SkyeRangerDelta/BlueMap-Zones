@@ -24,7 +24,7 @@ public class MovementHandler implements Listener {
 
   private static BlueMap_Zones BMZ = BlueMap_Zones.getInstance();
 
-  private static final String WILDERNESS = BMZ.getConfig().getString("Wilderness-Name");
+  private static String WILDERNESS = (String) ConfigHandler.getPluginConfFile().get( "Wilderness-Name" );
 
   public MovementHandler(ArrayList<ZonedShape> zonedShapes) {
     this.zonedShapes = zonedShapes;
@@ -296,5 +296,9 @@ public class MovementHandler implements Listener {
     }
 
     return subtitle;
+  }
+
+  public void reloadConfig() {
+    WILDERNESS = (String) ConfigHandler.getPluginConfFile().get( "Wilderness-Name" );
   }
 }

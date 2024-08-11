@@ -22,6 +22,8 @@ public class ConfigHandler {
 
   private static final List<File> fileConfigurations = new ArrayList<>();
 
+  private static BlueMap_Zones BMZ = BlueMap_Zones.getInstance();
+
   /**
    * @method confInit - Initialize the configuration files for the plugin.
    */
@@ -142,6 +144,8 @@ public class ConfigHandler {
    */
   public static void reloadPluginConfigFile() {
     loadConfig();
+
+    BMZ.movementHandler.reloadConfig();
   }
 
   /**
