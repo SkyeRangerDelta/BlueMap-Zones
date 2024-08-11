@@ -14,20 +14,14 @@ commands:
     description: "Generates the zones for BlueMap"
     usage: "/bmz-generate"
     permission: "bluemapzones.generate"
-    aliases:
-      - bmz-gen
   bmz-toggle-notices:
     description: "Toggles zone change notices for your client."
     usage: "/bmz-toggle-notices"
     permission: "bluemapzones.toggle-notices"
-    aliases:
-      - bmz-tn
   bmz-reload-conf:
     description: "Reloads the plugin configuration."
     usage: "/bmz-reload-conf"
     permission: "bluemapzones.reload"
-    aliases:
-      - bmz-rc
 permissions:
   bluemapzones.*:
     description: "Grants access to all BlueMap-Zones commands"

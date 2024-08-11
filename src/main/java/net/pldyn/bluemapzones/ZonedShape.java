@@ -3,9 +3,7 @@ package net.pldyn.bluemapzones;
 import com.flowpowered.math.vector.Vector2d;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
-import it.unimi.dsi.fastutil.Hash;
 
-import java.lang.reflect.Array;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -91,92 +89,64 @@ public class ZonedShape extends ShapeMarker {
    */
   public void doInteriorGeneration() {
 
-    Log.info("Starting interior generation on " + this.getLabel());
+    int intCount = 0;
+    Log.info( "Starting interior generation on " + this.getLabel() );
 
-    Vector2d chunkMax = this.getMaxChunk();
-    Vector2d chunkMin = this.getMinChunk();
+    // Start by finding an interior chunk. We'll do this by identifying a chunk ID that has a boundary chunk set in each cardinal direction.
+    // We'll start by moving tile by tile from min to max chunks checking for neighbors.
+    // When one is found, we'll execute an iterative flood fill to build the interior.
+    // Then run the same process to verify no chunks are missed.
 
-    //Determine sectors of the zone (8x8 set of chunks)
-    int zoneWidth = chunkMax.getFloorX() - chunkMin.getFloorX();
-    int zoneHeight = chunkMax.getFloorY() - chunkMin.getFloorY();
+    for (int x = minChunk.getFloorX(); x <= maxChunk.getFloorX(); x++) {
+      for (int z = minChunk.getFloorY(); z <= maxChunk.getFloorY(); z++) {
+        if (ownedChunks.containsKey(new Vector2d(x, z))) {
+          // Skip if we already know about this one
+          continue;
+        }
 
-    int sectorWidth = Math.floorDiv(zoneWidth, 8); //Sector count width
-    int sectorHeight = Math.floorDiv(zoneHeight, 8); //Sector count height
+        Vector2d startingId = new Vector2d(x, z);
+        Vector2d internalId = isInternal(startingId);
 
-    Vector2d startingId = findRootSeedChunk();
-    boolean ranInterior = false;
-
-    //We have a grid of sectors to work with, start in the sector with the seed and work through them
+        if (internalId != null) {
+          intCount++;
+          Log.info( "Found an internal (" + intCount + ") chunk at " + internalId + " for zone " + this.getLabel() );
+          buildInterior(internalId);
+        }
+      }
+    }
 
   }
 
   /**
-   * Finds the root seed chunk for interior generation.
-   * @return The root seed chunk for interior generation.
+   * @method isInternal - Casts a ray to all cardinal directions to determine if the chunk is internal.
+   * @param startingId - The starting chunk ID to check.
    */
-  private Vector2d findRootSeedChunk() {
-    Vector2d seedChunk = null;
+  private Vector2d isInternal(Vector2d startingId) {
+    Log.info( "Checking " + startingId );
+    boolean isInternal = true;
+    Vector2d testId = null;
 
-    for (Vector2d chunkId : ownedChunks.keySet()) {
-      ArrayList<Vector2d> zChunks = new ArrayList<>();
-      for (Vector2d zChunk : ownedChunks.keySet()) {
-        if (chunkId.getFloorY() != zChunk.getFloorY()) continue;
-        zChunks.add(zChunk);
-      }
+    int[][] directions = {
+        { 1, 0 },
+        { - 1, 0 },
+        { 0, 1 },
+        { 0, - 1 }
+    };
 
-      ArrayList<ArrayList<Vector2d>> chunkSets = findSets(zChunks);
-
-      if (chunkSets.size() == 2) {
-        ArrayList<Vector2d> firstSet = chunkSets.get(0);
-        seedChunk = firstSet.get(firstSet.size() - 1).add(1, 0);
+    for ( int[] direction : directions ) {
+      testId = new Vector2d( startingId.getFloorX() + direction[ 0 ], startingId.getFloorY() + direction[ 1 ] );
+      if ( ! ownedChunks.containsKey( testId ) ) {
+        isInternal = false;
         break;
       }
     }
 
-    if (seedChunk == null) {
-      Log.info("No suitable seed chunk found for zone " + this.getLabel() + " interior generation.");
+    if ( isInternal ) {
+      Log.info( "Chunk " + startingId + " is internal." );
+      return testId;
+    } else {
+      return null;
     }
-
-    return seedChunk;
-  }
-
-  /**
-   * Finds sets of chunks in a row from the same zone.
-   * @param rowChunks The chunks to find sets in.
-   * @return An ArrayList of ArrayLists of Vector2d, each inner ArrayList being a set of chunks.
-   */
-  private ArrayList<ArrayList<Vector2d>> findSets(ArrayList<Vector2d> rowChunks) {
-    ArrayList<ArrayList<Vector2d>> chunkSets = new ArrayList<>();
-    Collections.sort(rowChunks); //Ensure ids are X-> increasing
-    Vector2d prevId = null;
-    int i = 0;
-    for (Vector2d id : rowChunks) {
-      try {
-        chunkSets.get(i);
-      }
-      catch (IndexOutOfBoundsException e) {
-        chunkSets.add(new ArrayList<>());
-      }
-
-      if ((prevId == null)) {
-        chunkSets.get(i).add(id);
-        prevId = id;
-        continue;
-      }
-
-      if (!isAdjacent(prevId, id)) {
-        i++;
-        chunkSets.add(new ArrayList<>());
-        chunkSets.get(i).add(id);
-      }
-      else {
-        chunkSets.get(i).add(id);
-      }
-
-      prevId = id;
-    }
-
-    return chunkSets;
   }
 
   /**
@@ -185,13 +155,12 @@ public class ZonedShape extends ShapeMarker {
    */
   private void buildInterior(Vector2d startingId) {
     Log.info("Starting interior build.");
-    int queueSize = 1;
     Queue<Vector2d> chunkQueue = new LinkedList<>();
     chunkQueue.add(startingId);
 
-    while (!chunkQueue.isEmpty()) {
+    int addedChunks = 0;
 
-      queueSize++;
+    while (!chunkQueue.isEmpty()) {
       Vector2d currentId = chunkQueue.poll();
 
       if (ownedChunks.containsKey(currentId)) {
@@ -203,11 +172,25 @@ public class ZonedShape extends ShapeMarker {
       ZonedChunk newChunk = new ZonedChunk(currentId);
       newChunk.addOwner(this);
       ownedChunks.put(currentId, newChunk);
+      addedChunks++;
 
       //Add valid adjacent chunks to the queue
+      int[][] directions = {
+          { 1, 0 },
+          { - 1, 0 },
+          { 0, 1 },
+          { 0, - 1 }
+      };
+
+      for ( int[] direction : directions ) {
+        Vector2d intId = new Vector2d( startingId.getFloorX() + direction[ 0 ], startingId.getFloorY() + direction[ 1 ] );
+        if ( !ownedChunks.containsKey( intId ) && !chunkQueue.contains( intId ) ) {
+          chunkQueue.add( intId );
+        }
+      }
     }
 
-    Log.info("Finished with interior size " + queueSize + " chunks.");
+    Log.info("Finished with interior size " + addedChunks + " chunks.");
   }
 
   /**

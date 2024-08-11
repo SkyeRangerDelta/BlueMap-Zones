@@ -286,7 +286,7 @@ public class ZoneGenerator extends Thread {
     handleMarkerSet(objectiveSet);
 
     //Build shape interiors
-    generateShapeInteriors();
+//    generateShapeInteriors();
 
     // Handle data on main thread
     handleDataOnMainThread();
