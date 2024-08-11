@@ -11,10 +11,9 @@ import static net.pldyn.bluemapzones.MessageHandler.send;
 
 public class generateCommand implements CommandExecutor {
 
-    private final BlueMap_Zones plugin = BlueMap_Zones.getInstance();
-
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+        BlueMap_Zones plugin = BlueMap_Zones.getInstance();
         if ( plugin.isGenerating() ) {
             send(sender, "Generation already in progress!", NamedTextColor.RED);
             return true;

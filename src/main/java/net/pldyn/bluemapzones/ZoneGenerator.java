@@ -12,6 +12,8 @@ import org.bukkit.Bukkit;
 import java.util.*;
 import java.util.logging.Logger;
 
+import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSets;
+
 public class ZoneGenerator extends Thread {
   private static final Logger Log = Logger.getLogger("BM Zones");
   private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
@@ -38,7 +40,7 @@ public class ZoneGenerator extends Thread {
   }
 
   private MarkerSet findMarkerSets(BlueMapMap world) {
-    String markerID = (String) ConfigHandler.getPluginConfFile().get("Maps.marker-set");
+    String markerID = getMarkerSets().getFirst();
     Map<String, MarkerSet> markerSets = world.getMarkerSets();
 //    Log.info("World has " + markerSets.size() + " marker sets.");
 
@@ -278,7 +280,7 @@ public class ZoneGenerator extends Thread {
 
     MarkerSet objectiveSet = findMarkerSets(workingMap);
     if (objectiveSet == null) {
-      Log.warning("Couldn't find the marker set to load!");
+      Log.warning( "Couldn't find the marker set to load!" );
       return;
     }
 
