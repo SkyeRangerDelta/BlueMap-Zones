@@ -19,7 +19,7 @@ import static net.pldyn.bluemapzones.ConfigHandler.getNoticeExclusions;
 public class MovementHandler implements Listener {
 
   private static final Logger Log = Logger.getLogger("BM Zones");
-  private static final HashMap<Player, String> playerLocations = new HashMap<>();
+  private static final HashMap<Player, PCLocationHistory> playerLocations = new HashMap<>();
   private ArrayList<ZonedShape> zonedShapes;
 
   public MovementHandler(ArrayList<ZonedShape> zonedShapes) {
@@ -54,58 +54,87 @@ public class MovementHandler implements Listener {
     Location pcLocation = pc.getLocation();
     Vector2d chunkLocationID = new Vector2d(Math.floorDiv(pcLocation.getBlockX(), 16),
         Math.floorDiv(pcLocation.getBlockZ(), 16));
-    ZonedChunk chunk = getChunk(chunkLocationID);
 
-    if (chunk == null) {
-      playerLocations.put(pc, "Wilderness");
-      isNewZone( pc, chunkLocationID, chunkLocationID );
+    ZonedChunk chunk = getChunk(chunkLocationID); //Test if the chunk is on a boundary
+    ZonedShape zone = null;
+    PCLocationHistory loginChunkData;
+
+    if ( chunk == null ) { // If not, run bresenham
+      zone = castRayInAllDirections( chunkLocationID );
+      if ( zone != null ) {
+        loginChunkData = new PCLocationHistory(
+            zone.getLabel(), zone.getLabel()
+        );
+      }
+      else {
+        loginChunkData = new PCLocationHistory(
+            "Wilderness", "Wilderness"
+        );
+      }
     }
     else {
-      playerLocations.put(pc, chunk.getName());
-      printNewLocation(pc, chunk.getName(), chunk.isConflicted(), chunkLocationID);
+      String cName = chunk.getName();
+      loginChunkData = new PCLocationHistory(
+          cName, cName
+      );
     }
+
+    playerLocations.put(pc, loginChunkData);
+    printNewLocation( pc, loginChunkData.getLastAreaName(), false, chunkLocationID );
   }
 
   private void isNewZone(Player pc, Vector2d chunkId, Vector2d lastChunkId) {
-    String pcLastZone = playerLocations.get(pc);
+    PCLocationHistory pcHistory = playerLocations.get(pc);
+    String pcLastZone = pcHistory.getLastAreaName();
+    String pcLastNonConflictedZone = pcHistory.getLastNonConflictedAreaName();
 
-    ZonedChunk chunk = getChunk(chunkId);
-    ZonedChunk lastChunk = getChunk(lastChunkId);
+    ZonedChunk chunk = getChunk(chunkId); //Determine if the chunk is owned by a zone
+    ZonedChunk lastChunk = getChunk(lastChunkId); //Determine if the last chunk is owned by a zone
 
-    //TODO: If leaving boundary chunk; check if new owner was an owner on the last chunk and do nothing
-
-//    if ( lastChunk.isBoundary() ) {
-//      List<ZonedShape> newOwners = chunk.getOwners();
-//      List<ZonedShape> lastOwners = lastChunk.getOwners();
-//
-//      for ( ZonedShape newOwner : newOwners ) {
-//        if ( !lastOwners.contains( newOwner ) ) {
-//          playerLocations.put(pc, newOwner.getLabel());
-//          printNewLocation(pc, newOwner.getLabel(), false, chunkId);
-//          return;
-//        }
-//      }
-//    }
-
-    if (chunk == null) {
+    if (chunk == null) { // Not a boundary chunk (must be a ext or int chunk)
       // Run bresenham to determine if inside a shape
       ZonedShape zone = castRayInAllDirections(chunkId);
-      Log.info( "Zone: " + zone );
 
       if (zone == null) {
         if (pcLastZone.equals("Wilderness")) return;
-        playerLocations.put(pc, "Wilderness");
+        pcHistory.setLastAreaName("Wilderness");
         printNewLocation(pc, "Wilderness", false, chunkId);
       }
-      else {
+      else { // Inside a detected zone, therefore not a border - must be interior
+        Log.info( "Zone: " + zone.getLabel() );
         if (pcLastZone.equals(zone.getLabel())) return;
-        playerLocations.put(pc, zone.getLabel());
-        printNewLocation(pc, zone.getLabel(), false, chunkId);
+        pcHistory.setLastAreaName(zone.getLabel());
+
+        // Check if the last zone was null or not. This determines if the last zone was a border zone or
+        // if they've warped in.
+        if ( lastChunk == null ) {
+          // Warped or joined oddly.
+          pcHistory.setLastNonConflictedAreaName(zone.getLabel());
+          printNewLocation( pc, zone.getLabel(), false, chunkId );
+        }
+        else {
+          // Last chunk is known. If it was owned by the same zone, return.
+          if ( lastChunk.getOwners().contains( zone ) && !lastChunk.isConflicted() ) return;
+
+          // If the last chunk was a border chunk and the last non-conflicted chunk they were in
+          // was an owner in the border chunk, return.
+          if ( lastChunk.isConflicted() && Objects.equals( zone.getLabel(), pcLastNonConflictedZone ) ) return;
+
+          // Otherwise, print the new location.
+          printNewLocation( pc, zone.getLabel(), false, chunkId );
+        }
+
+        pcHistory.setLastNonConflictedAreaName(zone.getLabel());
       }
     }
-    else {
+    else { // Owned by a zone (border chunk)
       if (pcLastZone.equals(chunk.getName())) return;
-      playerLocations.put(pc, chunk.getName());
+      pcHistory.setLastAreaName(chunk.getName());
+
+      if ( !chunk.isConflicted() ) {
+        pcHistory.setLastNonConflictedAreaName(chunk.getName());
+      }
+
       printNewLocation(pc, chunk.getName(), chunk.isConflicted(), chunkId);
     }
   }
