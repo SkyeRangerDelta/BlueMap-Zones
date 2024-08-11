@@ -99,6 +99,7 @@ public class ConfigHandler {
   public static void createPluginDefaults() {
     pluginConfFile.addDefault("Maps.name", "world");
     pluginConfFile.addDefault("Maps.marker-set", "myMarkers");
+    pluginConfFile.addDefault("Wilderness-Name", "Wilderness");
     savePluginConfFile();
 
     noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<>());

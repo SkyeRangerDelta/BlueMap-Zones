@@ -22,6 +22,10 @@ public class MovementHandler implements Listener {
   private static final HashMap<Player, PCLocationHistory> playerLocations = new HashMap<>();
   private ArrayList<ZonedShape> zonedShapes;
 
+  private static BlueMap_Zones BMZ = BlueMap_Zones.getInstance();
+
+  private static final String WILDERNESS = BMZ.getConfig().getString("Wilderness-Name");
+
   public MovementHandler(ArrayList<ZonedShape> zonedShapes) {
     this.zonedShapes = zonedShapes;
   }
@@ -68,7 +72,7 @@ public class MovementHandler implements Listener {
       }
       else {
         loginChunkData = new PCLocationHistory(
-            "Wilderness", "Wilderness"
+            WILDERNESS, WILDERNESS
         );
       }
     }
@@ -96,9 +100,9 @@ public class MovementHandler implements Listener {
       ZonedShape zone = castRayInAllDirections(chunkId);
 
       if (zone == null) {
-        if (pcLastZone.equals("Wilderness")) return;
-        pcHistory.setLastAreaName("Wilderness");
-        printNewLocation(pc, "Wilderness", false, chunkId);
+        if (pcLastZone.equals(WILDERNESS)) return;
+        pcHistory.setLastAreaName(WILDERNESS);
+        printNewLocation(pc, WILDERNESS, false, chunkId);
       }
       else { // Inside a detected zone, therefore not a border - must be interior
         Log.info( "Zone: " + zone.getLabel() );
