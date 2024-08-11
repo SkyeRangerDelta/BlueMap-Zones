@@ -15,6 +15,11 @@ public class generateCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+        if ( plugin.isGenerating() ) {
+            send(sender, "Generation already in progress!", NamedTextColor.RED);
+            return true;
+        }
+
         send(sender, "Generating zones...", NamedTextColor.GREEN);
 
         plugin.generateZones();

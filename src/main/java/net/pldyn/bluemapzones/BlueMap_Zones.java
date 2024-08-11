@@ -18,9 +18,10 @@ public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCal
   public MovementHandler movementHandler;
   public ToolHandler toolHandler;
 
-  private ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private BlueMapAPI bma;
   private static BlueMap_Zones BMZ;
+
+  private ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private boolean runningGeneration = false;
 
   @Override
@@ -50,16 +51,16 @@ public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCal
     toolHandler = new ToolHandler(zonedShapes);
 
     Objects.requireNonNull(
-        getCommand( "bmz-generate" ) )
-        .setExecutor( new generateCommand() );
+      getCommand( "bmz-generate" ) )
+      .setExecutor( new generateCommand() );
 
     Objects.requireNonNull(
-            getCommand( "bmz-toggle-notices" ) )
-        .setExecutor( new toggleNoticeCommand() );
+      getCommand( "bmz-toggle-notices" ) )
+      .setExecutor( new toggleNoticeCommand() );
 
     Objects.requireNonNull(
-            getCommand( "bmz-reload-conf" ) )
-        .setExecutor( new reloadConfCommand() );
+      getCommand( "bmz-reload-conf" ) )
+      .setExecutor( new reloadConfCommand() );
 
     getServer().getPluginManager().registerEvents(movementHandler, this);
     getServer().getPluginManager().registerEvents(toolHandler, this);
@@ -91,14 +92,18 @@ public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCal
   }
 
   public BlueMapAPI getBlueMapAPI() {
-      return bma;
+    return bma;
   }
 
   public static BlueMap_Zones getInstance() {
-      return BMZ;
+    return BMZ;
   }
 
   public void setGenerating(boolean generating) {
-      runningGeneration = generating;
+    runningGeneration = generating;
+  }
+
+  public boolean isGenerating() {
+    return runningGeneration;
   }
 }
