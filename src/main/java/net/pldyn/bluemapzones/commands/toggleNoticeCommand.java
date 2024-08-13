@@ -4,15 +4,17 @@ import net.pldyn.bluemapzones.BlueMap_Zones;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.UUID;
 
 import static net.pldyn.bluemapzones.ConfigHandler.*;
 
-public class toggleNoticeCommand implements CommandExecutor {
+public class toggleNoticeCommand implements CommandExecutor, TabExecutor {
 
   private final BlueMap_Zones plugin = BlueMap_Zones.getInstance();
 
@@ -35,5 +37,10 @@ public class toggleNoticeCommand implements CommandExecutor {
     }
 
     return false;
+  }
+
+  @Override
+  public @Nullable List<String> onTabComplete( @NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
+    return null;
   }
 }
