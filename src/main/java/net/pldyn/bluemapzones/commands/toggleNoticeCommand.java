@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,6 +42,12 @@ public class toggleNoticeCommand implements CommandExecutor, TabExecutor {
 
   @Override
   public @Nullable List<String> onTabComplete( @NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
-    return null;
+    List<String> completions = new ArrayList<>();
+
+    completions.add( "off" );
+    completions.add( "on" );
+    completions.add( "chat" );
+
+    return completions;
   }
 }
