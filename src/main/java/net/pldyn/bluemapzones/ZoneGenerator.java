@@ -7,7 +7,10 @@ import de.bluecolored.bluemap.api.markers.Marker;
 import de.bluecolored.bluemap.api.markers.MarkerSet;
 import de.bluecolored.bluemap.api.markers.ShapeMarker;
 import de.bluecolored.bluemap.api.math.Shape;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -19,12 +22,10 @@ public class ZoneGenerator extends Thread {
   private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private final BlueMapAPI blueMapAPI;
   private final BlueMap_Zones plugin;
-  private final ZoneGenerationCallback callback;
 
-  public ZoneGenerator(BlueMapAPI blueMapApi, BlueMap_Zones plugin, ZoneGenerationCallback callback) {
+  public ZoneGenerator(BlueMapAPI blueMapApi, BlueMap_Zones plugin) {
     this.blueMapAPI = blueMapApi;
     this.plugin = plugin;
-    this.callback = callback;
   }
 
   private BlueMapMap findConfMaps(Collection<BlueMapMap> loadedWorlds) {
@@ -284,6 +285,8 @@ public class ZoneGenerator extends Thread {
       return;
     }
 
+    zonedShapes.clear();
+
     //Build shapes and their bounds
     handleMarkerSet(objectiveSet);
 
@@ -303,6 +306,10 @@ public class ZoneGenerator extends Thread {
     Log.info("Generation includes " + zonedShapes.size() + " shapes with a total of "
         + chunkCount + " chunks.");
 
-    callback.onZoneGenerationComplete( zonedShapes );
+    Component message = Component.text("Generation done!").color( NamedTextColor.GREEN );
+    Bukkit.getServer().sendMessage( message );
+
+    plugin.setGenerating( false );
+    plugin.setZonedShapes( zonedShapes );
   }
 }

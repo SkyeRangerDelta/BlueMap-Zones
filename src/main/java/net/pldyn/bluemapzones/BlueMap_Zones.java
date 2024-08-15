@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.logging.Logger;
 
-public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCallback {
+public final class BlueMap_Zones extends JavaPlugin {
 
   private static final Logger Log = Logger.getLogger("BM Zones");
   private java.util.UUID UUID;
@@ -70,25 +70,25 @@ public final class BlueMap_Zones extends JavaPlugin implements ZoneGenerationCal
     Log.info("Plugin initialized!");
   }
 
-  @Override
-  public void onZoneGenerationComplete(ArrayList<ZonedShape> zonedShapes) {
-    runningGeneration = false;
-    setZonedShapes(zonedShapes);
-    Log.info("Zone generation complete!");
-    Log.info("Generated " + zonedShapes.size() + " zones.");
-
-    movementHandler.setZonedShapes( zonedShapes );
-  }
+//  @Override
+//  public void onZoneGenerationComplete(ArrayList<ZonedShape> zonedShapes) {
+//    runningGeneration = false;
+//    setZonedShapes(zonedShapes);
+//    Log.info("Zone generation complete!");
+//    Log.info("Generated " + zonedShapes.size() + " zones.");
+//  }
 
   public void generateZones() {
+    zonedShapes.clear();
     runningGeneration = true;
-    new ZoneGenerator(bma, this, this).start();
+    new ZoneGenerator(bma, this).start();
     Log.info("Zone generation started!");
   }
 
   public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
     this.zonedShapes.clear();
     this.zonedShapes = zonedShapes;
+    movementHandler.setZonedShapes( zonedShapes );
   }
 
   public BlueMapAPI getBlueMapAPI() {
