@@ -34,7 +34,7 @@ permissions:
     default: op
   bluemapzones.toggle-notices:
     description: "Allows the player to toggle zone change notices for their client."
-    default: op
+    default: not op
   bluemapzones.reload:
     description: "Allows the player to reload the plugin configuration."
     default: op
