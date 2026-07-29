@@ -104,8 +104,9 @@ public class ConfigHandler {
     pluginConfFile.options().setHeader( headerComments );
 
     pluginConfFile.addDefault("Wilderness-Name", "Wilderness");
+    pluginConfFile.addDefault("Maps", new ArrayList<String>());
     pluginConfFile.addDefault("Maps.name", "world");
-    pluginConfFile.addDefault("Maps.marker-sets", new ArrayList<String>());
+    pluginConfFile.addDefault("Maps.name.marker-sets", new ArrayList<String>());
     savePluginConfFile();
 
     noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<String>());
@@ -117,7 +118,7 @@ public class ConfigHandler {
    * @return {List<String>}
    */
   public static List<String> getMarkerSets() {
-    return pluginConfFile.getStringList("Maps.marker-sets");
+    return pluginConfFile.getStringList("Maps.name.marker-sets");
   }
 
   /**
