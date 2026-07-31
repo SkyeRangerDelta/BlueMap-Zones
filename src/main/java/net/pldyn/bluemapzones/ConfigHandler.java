@@ -14,6 +14,9 @@ import java.util.logging.Logger;
 public class ConfigHandler {
   private static final Logger Log = Logger.getLogger("BM Zones");
 
+  /** Section in BMZ-NoticeExclusions.yml mapping a player UUID to a NoticeType id. */
+  private static final String NOTICES_PATH = "Notices";
+
   private static File confFile;
   private static FileConfiguration pluginConfFile;
 
@@ -108,8 +111,33 @@ public class ConfigHandler {
     pluginConfFile.addDefault("Maps.marker-sets", new ArrayList<String>());
     savePluginConfFile();
 
-    noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<String>());
+    migrateNoticeExclusions();
     saveNoticeExclusionsConf();
+  }
+
+  /**
+   * @method migrateNoticeExclusions - Convert the legacy flat "Exclusions" list of UUIDs
+   *     into the "Notices" section, which maps each UUID to a notice type. Players who had
+   *     opted out become NoticeType.OFF; everyone else falls through to NoticeType.DEFAULT.
+   *     Safe to call repeatedly - it is a no-op once "Exclusions" is gone.
+   */
+  private static void migrateNoticeExclusions() {
+    if (!noticeExclusionsConfFile.contains("Exclusions")) return;
+
+    List<String> legacyExclusions = noticeExclusionsConfFile.getStringList("Exclusions");
+
+    for (String uuid : legacyExclusions) {
+      // Do not clobber a preference that already exists in the new format.
+      if (noticeExclusionsConfFile.contains(NOTICES_PATH + "." + uuid)) continue;
+      noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, NoticeType.OFF.getId());
+    }
+
+    noticeExclusionsConfFile.set("Exclusions", null);
+
+    if (!legacyExclusions.isEmpty()) {
+      Log.info("Migrated " + legacyExclusions.size() + " notice exclusion(s) to the "
+          + NOTICES_PATH + " format.");
+    }
   }
 
   /**
@@ -161,38 +189,31 @@ public class ConfigHandler {
   }
 
   /**
-   * @method addNoticeExclusion - Add a UUID to the notice exclusions list.
-   * @param uuid
+   * @method getNoticeType - Get the notice type stored for a player.
+   * @param uuid The player's UUID.
+   * @return The stored type, or NoticeType.DEFAULT if none is set or the stored
+   *     value is not recognised.
    */
-  public static void addNoticeExclusion(UUID uuid) {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    exclusions.add(uuid.toString());
-    noticeExclusionsConfFile.set("Exclusions", exclusions);
-    saveNoticeExclusionsConf();
-  }
+  public static NoticeType getNoticeType(UUID uuid) {
+    String stored = noticeExclusionsConfFile.getString(NOTICES_PATH + "." + uuid);
+    NoticeType type = NoticeType.fromId(stored);
 
-  /**
-   * @method removeNoticeExclusion - Remove a UUID from the notice exclusions list.
-   * @param uuid
-   */
-  public static void removeNoticeExclusion(UUID uuid) {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    exclusions.remove(uuid.toString());
-    noticeExclusionsConfFile.set("Exclusions", exclusions);
-    saveNoticeExclusionsConf();
-  }
-
-  /**
-   * @method getNoticeExclusions - Get the list of UUIDs to exclude from notices.
-   * @return {List<UUID>}
-   */
-  public static List<UUID> getNoticeExclusions() {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    List<UUID> uuidList = new ArrayList<>();
-    for (String exclusion : exclusions) {
-      uuidList.add(UUID.fromString(exclusion));
+    if (stored != null && type == null) {
+      Log.warning("Unrecognised notice type '" + stored + "' for " + uuid
+          + "; falling back to " + NoticeType.DEFAULT.getId() + ".");
     }
-    return uuidList;
+
+    return type == null ? NoticeType.DEFAULT : type;
+  }
+
+  /**
+   * @method setNoticeType - Store the notice type for a player and persist it.
+   * @param uuid The player's UUID.
+   * @param type The type to store.
+   */
+  public static void setNoticeType(UUID uuid, NoticeType type) {
+    noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, type.getId());
+    saveNoticeExclusionsConf();
   }
 
   /**

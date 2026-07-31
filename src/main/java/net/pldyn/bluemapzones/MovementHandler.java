@@ -2,6 +2,7 @@ package net.pldyn.bluemapzones;
 
 import com.flowpowered.math.vector.Vector2d;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -14,7 +15,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import java.util.*;
 import java.util.logging.Logger;
 
-import static net.pldyn.bluemapzones.ConfigHandler.getNoticeExclusions;
+import static net.pldyn.bluemapzones.ConfigHandler.getNoticeType;
 
 public class MovementHandler implements Listener {
 
@@ -266,18 +267,24 @@ public class MovementHandler implements Listener {
 
     if ( isBoundary ) return;
 
-    Title newAreaTitle = Title.title(
-        Component.text(chunkName),
-        Component.text(buildSubtitle(chunkName))
-    );
-
 //    Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
 
-    List<UUID> exclusionsList = getNoticeExclusions();
-    if (exclusionsList.contains(pc.getUniqueId())) return;
+    NoticeType noticeType = getNoticeType( pc.getUniqueId() );
+    if ( noticeType == NoticeType.OFF ) return;
 
-    pc.showTitle(newAreaTitle);
-    pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
+    if ( noticeType.showsTitle() ) {
+      Title newAreaTitle = Title.title(
+          Component.text(chunkName),
+          Component.text(buildSubtitle(chunkName))
+      );
+
+      pc.showTitle(newAreaTitle);
+      pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
+    }
+
+    if ( noticeType.showsChat() ) {
+      MessageHandler.send( pc, "Now entering " + chunkName + ".", NamedTextColor.AQUA );
+    }
   }
 
   private ZonedChunk getChunk(Vector2d chunkId) {

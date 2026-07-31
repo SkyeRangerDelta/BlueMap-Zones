@@ -54,9 +54,13 @@ public final class BlueMap_Zones extends JavaPlugin {
       getCommand( "bmz-generate" ) )
       .setExecutor( new generateCommand() );
 
+    toggleNoticeCommand toggleNotices = new toggleNoticeCommand();
     Objects.requireNonNull(
       getCommand( "bmz-toggle-notices" ) )
-      .setExecutor( new toggleNoticeCommand() );
+      .setExecutor( toggleNotices );
+    Objects.requireNonNull(
+      getCommand( "bmz-toggle-notices" ) )
+      .setTabCompleter( toggleNotices );
 
     Objects.requireNonNull(
       getCommand( "bmz-reload-conf" ) )

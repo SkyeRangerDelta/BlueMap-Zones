@@ -15,8 +15,8 @@ commands:
     usage: "/bmz-generate"
     permission: "bluemapzones.generate"
   bmz-toggle-notices:
-    description: "Toggles zone change notices for your client."
-    usage: "/bmz-toggle-notices [type]"
+    description: "Sets how you are notified when you enter a new zone."
+    usage: "/bmz-toggle-notices [off|title|chat|both]"
     permission: "bluemapzones.toggle-notices"
   bmz-reload-conf:
     description: "Reloads the plugin configuration."
