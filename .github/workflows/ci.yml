@@ -57,6 +57,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # This repo is authored on Windows with core.fileMode=false, so the
+      # executable bit on gradlew can silently regress in a commit. Redundant
+      # when the index has it (100755), cheap insurance when it does not.
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Build with Gradle
         run: ./gradlew build --no-daemon
 

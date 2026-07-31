@@ -40,6 +40,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # semantic-release's prepareCmd shells out to ./gradlew, so the
+      # executable bit matters here too. See the note in ci.yml.
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

@@ -23,5 +23,9 @@ jobs:
           java-version: "21"
           distribution: "temurin"
 
+      # The action invokes the Gradle wrapper. See the note in ci.yml.
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Generate and submit dependency graph
         uses: gradle/actions/dependency-submission@v4
