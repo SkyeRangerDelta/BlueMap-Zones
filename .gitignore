@@ -1,6 +1,5 @@
 # User-specific stuff
 .idea/
-/.idea/
 /.claude/
 CLAUDE.md
 
@@ -119,3 +118,6 @@ run/
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+
+# Node (semantic-release tooling only; this is not a Node project)
+node_modules/
