@@ -1,0 +1,92 @@
+{
+  "branches": [
+    "master",
+    { "name": "development", "prerelease": "rc" }
+  ],
+  "tagFormat": "v${version}",
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          { "breaking": true, "release": "major" },
+          { "type": "Breaking", "release": "major" },
+          { "type": "New", "release": "minor" },
+          { "type": "feat", "release": "minor" },
+          { "type": "Fix", "release": "patch" },
+          { "type": "fix", "release": "patch" },
+          { "type": "Refactor", "release": "patch" },
+          { "type": "refactor", "release": "patch" },
+          { "type": "Perf", "release": "patch" },
+          { "type": "perf", "release": "patch" },
+          { "type": "Chore", "release": false },
+          { "type": "chore", "release": false },
+          { "type": "CI", "release": false },
+          { "type": "ci", "release": false },
+          { "type": "Build", "release": false },
+          { "type": "build", "release": false },
+          { "type": "Docs", "release": false },
+          { "type": "docs", "release": false }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "types": [
+            { "type": "Breaking", "section": "Breaking Changes" },
+            { "type": "New", "section": "Features" },
+            { "type": "feat", "section": "Features" },
+            { "type": "Fix", "section": "Bug Fixes" },
+            { "type": "fix", "section": "Bug Fixes" },
+            { "type": "Refactor", "section": "Refactoring" },
+            { "type": "refactor", "section": "Refactoring" },
+            { "type": "Perf", "section": "Performance" },
+            { "type": "perf", "section": "Performance" },
+            { "type": "Chore", "hidden": true },
+            { "type": "chore", "hidden": true },
+            { "type": "CI", "hidden": true },
+            { "type": "ci", "hidden": true },
+            { "type": "Build", "hidden": true },
+            { "type": "build", "hidden": true },
+            { "type": "Docs", "hidden": true },
+            { "type": "docs", "hidden": true }
+          ]
+        }
+      }
+    ],
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "printf 'version=%s\\n' '${nextRelease.version}' > gradle.properties && ./gradlew clean build --no-daemon"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["CHANGELOG.md", "gradle.properties"],
+        "message": "Chore: release ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "build/libs/BlueMap-Zones-*.jar",
+            "label": "BlueMap-Zones-${nextRelease.version}.jar"
+          }
+        ]
+      }
+    ]
+  ]
+}

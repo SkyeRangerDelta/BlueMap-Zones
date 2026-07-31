@@ -2,8 +2,8 @@ plugins {
     id 'java'
 }
 
+// version is defined in gradle.properties and managed by semantic-release
 group = 'net.pldyn'
-version = '1.0.0-beta.3.1'
 
 repositories {
     mavenCentral()
