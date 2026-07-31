@@ -1,0 +1,27 @@
+name: Dependency Submission
+
+# Submits the Gradle dependency graph so Dependabot can raise alerts against
+# the plugin's actual resolved dependencies.
+on:
+  push:
+    branches: ["master", "development"]
+
+permissions:
+  contents: write
+
+jobs:
+  dependency-submission:
+    name: Submit dependency graph
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@v4

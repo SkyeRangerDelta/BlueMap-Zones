@@ -1,0 +1,15 @@
+---
+extends: default
+
+rules:
+  # GitHub Actions workflows use `on:` as a key, which yamllint otherwise
+  # flags as a truthy value.
+  truthy:
+    check-keys: false
+  # Workflow files conventionally omit the leading `---`.
+  document-start: disable
+  line-length:
+    max: 120
+    level: warning
+  comments:
+    min-spaces-from-content: 1
