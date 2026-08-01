@@ -15,13 +15,17 @@ commands:
     usage: "/bmz-generate"
     permission: "bluemapzones.generate"
   bmz-toggle-notices:
-    description: "Toggles zone change notices for your client."
-    usage: "/bmz-toggle-notices"
+    description: "Sets how you are notified when you enter a new zone."
+    usage: "/bmz-toggle-notices [off|title|chat|both]"
     permission: "bluemapzones.toggle-notices"
   bmz-reload-conf:
     description: "Reloads the plugin configuration."
     usage: "/bmz-reload-conf"
     permission: "bluemapzones.reload"
+  bmz-markerset:
+    description: "Manages which BlueMap marker sets zones are built from."
+    usage: "/bmz-markerset <add|remove|list> [marker-set]"
+    permission: "bluemapzones.markerset"
 permissions:
   bluemapzones.*:
     description: "Grants access to all BlueMap-Zones commands"
@@ -29,6 +33,7 @@ permissions:
       bluemapzones.generate: true
       bluemapzones.toggle-notices: true
       bluemapzones.reload: true
+      bluemapzones.markerset: true
   bluemapzones.generate:
     description: "Allows the player to generate the zones for BlueMap"
     default: op
@@ -37,4 +42,7 @@ permissions:
     default: not op
   bluemapzones.reload:
     description: "Allows the player to reload the plugin configuration."
+    default: op
+  bluemapzones.markerset:
+    description: "Allows the player to manage the configured BlueMap marker sets."
     default: op

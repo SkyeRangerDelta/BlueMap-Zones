@@ -1,0 +1,60 @@
+name: Release
+
+# Cuts a release after a PR lands:
+#   development -> release candidate (vX.Y.Z-rc.N, marked pre-release)
+#   master      -> stable release    (vX.Y.Z)
+# Version and tag are derived from commit messages by semantic-release.
+on:
+  push:
+    branches: ["master", "development"]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # semantic-release needs the full history and all tags to work out
+          # the last release. persist-credentials:false lets it manage its own
+          # auth via GITHUB_TOKEN.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # semantic-release's prepareCmd shells out to ./gradlew, so the
+      # executable bit matters here too. See the note in ci.yml.
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install release tooling
+        run: npm clean-install
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release

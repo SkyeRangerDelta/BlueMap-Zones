@@ -1,7 +1,9 @@
 package net.pldyn.bluemapzones;
 
 import de.bluecolored.bluemap.api.BlueMapAPI;
+import de.bluecolored.bluemap.api.BlueMapMap;
 import net.pldyn.bluemapzones.commands.generateCommand;
+import net.pldyn.bluemapzones.commands.markerSetCommand;
 import net.pldyn.bluemapzones.commands.reloadConfCommand;
 import net.pldyn.bluemapzones.commands.toggleNoticeCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -48,19 +50,41 @@ public final class BlueMap_Zones extends JavaPlugin {
 
     UUID = java.util.UUID.randomUUID();
     movementHandler = new MovementHandler(zonedShapes);
-    toolHandler = new ToolHandler(zonedShapes);
+    // Resolves zones through movementHandler, so it holds no shape list of its own
+    // and cannot go stale after a regeneration.
+    toolHandler = new ToolHandler();
 
+    generateCommand generate = new generateCommand();
     Objects.requireNonNull(
       getCommand( "bmz-generate" ) )
-      .setExecutor( new generateCommand() );
+      .setExecutor( generate );
+    Objects.requireNonNull(
+      getCommand( "bmz-generate" ) )
+      .setTabCompleter( generate );
 
+    toggleNoticeCommand toggleNotices = new toggleNoticeCommand();
     Objects.requireNonNull(
       getCommand( "bmz-toggle-notices" ) )
-      .setExecutor( new toggleNoticeCommand() );
+      .setExecutor( toggleNotices );
+    Objects.requireNonNull(
+      getCommand( "bmz-toggle-notices" ) )
+      .setTabCompleter( toggleNotices );
 
+    reloadConfCommand reloadConf = new reloadConfCommand();
     Objects.requireNonNull(
       getCommand( "bmz-reload-conf" ) )
-      .setExecutor( new reloadConfCommand() );
+      .setExecutor( reloadConf );
+    Objects.requireNonNull(
+      getCommand( "bmz-reload-conf" ) )
+      .setTabCompleter( reloadConf );
+
+    markerSetCommand markerSets = new markerSetCommand();
+    Objects.requireNonNull(
+      getCommand( "bmz-markerset" ) )
+      .setExecutor( markerSets );
+    Objects.requireNonNull(
+      getCommand( "bmz-markerset" ) )
+      .setTabCompleter( markerSets );
 
     getServer().getPluginManager().registerEvents(movementHandler, this);
     getServer().getPluginManager().registerEvents(toolHandler, this);
@@ -79,20 +103,43 @@ public final class BlueMap_Zones extends JavaPlugin {
 //  }
 
   public void generateZones() {
-    zonedShapes.clear();
+    // Deliberately does not clear the live zones here. The existing zones stay
+    // usable until the new generation finishes and hands over a replacement.
     runningGeneration = true;
     new ZoneGenerator(bma, this).start();
     Log.info("Zone generation started!");
   }
 
-  public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
-    this.zonedShapes.clear();
-    this.zonedShapes = zonedShapes;
-    movementHandler.setZonedShapes( zonedShapes );
+  /**
+   * @method setZonedShapes - Publish a completed generation to everything that reads zones.
+   * @param newShapes The shapes the generator produced.
+   */
+  public void setZonedShapes(ArrayList<ZonedShape> newShapes) {
+    // Copy rather than alias. The generator owns its own list, and previously
+    // this method cleared the very list it was being handed, wiping every
+    // regeneration after the first.
+    this.zonedShapes = new ArrayList<>( newShapes );
+
+    movementHandler.setZonedShapes( this.zonedShapes );
   }
 
   public BlueMapAPI getBlueMapAPI() {
     return bma;
+  }
+
+  /**
+   * @method getConfiguredMap - Resolve the BlueMap map named by Maps.name in the config.
+   * @return The matching map, or null if BlueMap is not ready yet or no map has that id.
+   */
+  public BlueMapMap getConfiguredMap() {
+    if (bma == null) return null;
+
+    String confMap = (String) ConfigHandler.getPluginConfFile().get( "Maps.name" );
+    for (BlueMapMap map : bma.getMaps()) {
+      if (map.getId().equals(confMap)) return map;
+    }
+
+    return null;
   }
 
   public static BlueMap_Zones getInstance() {

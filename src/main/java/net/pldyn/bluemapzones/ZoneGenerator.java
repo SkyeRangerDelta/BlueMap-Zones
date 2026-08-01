@@ -13,13 +13,16 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSets;
 
 public class ZoneGenerator extends Thread {
   private static final Logger Log = Logger.getLogger("BM Zones");
-  private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
+  // Per-generation, NOT static. A shared static list let one run's results be
+  // cleared out from under a later run.
+  private final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private final BlueMapAPI blueMapAPI;
   private final BlueMap_Zones plugin;
 
@@ -37,21 +40,35 @@ public class ZoneGenerator extends Thread {
       }
     }
 
+    Log.warning("No BlueMap map has the id '" + confWorld + "'. Set Maps.name in "
+        + "BMZ-Config.yml to one of: " + describeIds(loadedWorlds));
     return null;
   }
 
   private MarkerSet findMarkerSets(BlueMapMap world) {
-    String markerID = getMarkerSets().getFirst();
+    List<String> configuredSets = getMarkerSets();
     Map<String, MarkerSet> markerSets = world.getMarkerSets();
-//    Log.info("World has " + markerSets.size() + " marker sets.");
 
     if (markerSets.isEmpty()) {
-      Log.info("Map has no marker sets!");
+      Log.warning("Map '" + world.getId() + "' has no marker sets at all. Create one in "
+          + "BlueMap before generating zones.");
       return null;
     }
 
+    // An unconfigured server has "marker-sets: []", which would otherwise blow up
+    // on getFirst() and kill this thread.
+    if (configuredSets.isEmpty()) {
+      Log.warning("No marker sets are configured. Add one of these ids to Maps.marker-sets "
+          + "in BMZ-Config.yml, then run /bmz-generate: "
+          + String.join(", ", markerSets.keySet()));
+      return null;
+    }
+
+    String markerID = configuredSets.getFirst();
+
     if (!markerSets.containsKey(markerID)) {
-      Log.info("Marker set requested is not available!");
+      Log.warning("Marker set '" + markerID + "' is not available on map '" + world.getId()
+          + "'. Available marker sets: " + String.join(", ", markerSets.keySet()));
       return null;
     }
 
@@ -59,6 +76,22 @@ public class ZoneGenerator extends Thread {
 
     if (mSet != null) Log.info("Found the configured marker set. (" + mSet.getLabel() + ")");
     return mSet;
+  }
+
+  /**
+   * @method describeIds - Render the available BlueMap map ids for an error message.
+   * @param maps The maps BlueMap currently has loaded.
+   * @return A comma separated list of ids, or a placeholder when none are loaded.
+   */
+  private String describeIds(Collection<BlueMapMap> maps) {
+    if (maps.isEmpty()) return "(BlueMap has no maps loaded)";
+
+    List<String> ids = new ArrayList<>();
+    for (BlueMapMap m : maps) {
+      ids.add(m.getId());
+    }
+
+    return String.join(", ", ids);
   }
 
   private void handleMarkerSet(MarkerSet markerSet) {
@@ -69,8 +102,16 @@ public class ZoneGenerator extends Thread {
       Log.info("Thinking about shape " + ++shapeCount + " of " + setMarkers.size());
       String key = entry.getKey();
       Marker value = entry.getValue();
-      assert false;
-      zonedShapes.add(catalogMarker(key, value, zonedShapes));
+
+      // catalogMarker returns null for anything that is not a ShapeMarker
+      // (POIs, lines, extrusions). Those must not enter the zone list.
+      ZonedShape cataloged = catalogMarker(key, value, zonedShapes);
+      if (cataloged == null) {
+        Log.info("Skipping '" + key + "' - not a shape marker.");
+        continue;
+      }
+
+      zonedShapes.add(cataloged);
     }
   }
 
@@ -269,6 +310,20 @@ public class ZoneGenerator extends Thread {
   }
 
   public void run() {
+    try {
+      doGeneration();
+    }
+    catch (Exception generationErr) {
+      Log.log( Level.WARNING, "Zone generation failed unexpectedly.", generationErr );
+    }
+    finally {
+      // Must always run. If the flag stays set, /bmz-generate reports
+      // "Generation already in progress!" forever, until the server restarts.
+      plugin.setGenerating( false );
+    }
+  }
+
+  private void doGeneration() {
     Log.info("Starting child thread generator.");
 
     Log.info("API loaded.");
@@ -282,6 +337,12 @@ public class ZoneGenerator extends Thread {
     MarkerSet objectiveSet = findMarkerSets(workingMap);
     if (objectiveSet == null) {
       Log.warning( "Couldn't find the marker set to load!" );
+
+      // An empty marker-sets list is a deliberate "no zones" state, so publish
+      // that. Other failures are errors, and leave the existing zones alone
+      // rather than wiping them over a transient problem.
+      if (getMarkerSets().isEmpty()) plugin.setZonedShapes( new ArrayList<>() );
+
       return;
     }
 
@@ -309,7 +370,7 @@ public class ZoneGenerator extends Thread {
     Component message = Component.text("Generation done!").color( NamedTextColor.GREEN );
     Bukkit.getServer().sendMessage( message );
 
-    plugin.setGenerating( false );
+    // The generating flag is cleared by run()'s finally block.
     plugin.setZonedShapes( zonedShapes );
   }
 }

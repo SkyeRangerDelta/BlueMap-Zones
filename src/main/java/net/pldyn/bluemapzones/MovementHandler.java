@@ -2,6 +2,7 @@ package net.pldyn.bluemapzones;
 
 import com.flowpowered.math.vector.Vector2d;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -14,7 +15,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import java.util.*;
 import java.util.logging.Logger;
 
-import static net.pldyn.bluemapzones.ConfigHandler.getNoticeExclusions;
+import static net.pldyn.bluemapzones.ConfigHandler.getNoticeType;
 
 public class MovementHandler implements Listener {
 
@@ -262,22 +263,45 @@ public class MovementHandler implements Listener {
     this.zonedShapes = zonedShapes;
   }
 
+  /**
+   * @method resolveAreaName - Work out the display name for a chunk, using the same
+   *     boundary lookup and ray cast that drives zone notices. Only boundary chunks are
+   *     stored, so an interior chunk has to be resolved by casting rays.
+   * @param chunkId The chunk to identify.
+   * @return The zone or boundary name, or the configured wilderness name.
+   */
+  public String resolveAreaName(Vector2d chunkId) {
+    ZonedChunk chunk = getChunk( chunkId );
+    if (chunk != null) return chunk.getName();
+
+    ZonedShape zone = castRayInAllDirections( chunkId );
+    if (zone != null) return zone.getLabel();
+
+    return WILDERNESS;
+  }
+
   private void printNewLocation(Player pc, String chunkName, boolean isBoundary, Vector2d chunkId) {
 
     if ( isBoundary ) return;
 
-    Title newAreaTitle = Title.title(
-        Component.text(chunkName),
-        Component.text(buildSubtitle(chunkName))
-    );
-
 //    Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
 
-    List<UUID> exclusionsList = getNoticeExclusions();
-    if (exclusionsList.contains(pc.getUniqueId())) return;
+    NoticeType noticeType = getNoticeType( pc.getUniqueId() );
+    if ( noticeType == NoticeType.OFF ) return;
 
-    pc.showTitle(newAreaTitle);
-    pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
+    if ( noticeType.showsTitle() ) {
+      Title newAreaTitle = Title.title(
+          Component.text(chunkName),
+          Component.text(buildSubtitle(chunkName))
+      );
+
+      pc.showTitle(newAreaTitle);
+      pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
+    }
+
+    if ( noticeType.showsChat() ) {
+      MessageHandler.send( pc, "Now entering " + chunkName + ".", NamedTextColor.AQUA );
+    }
   }
 
   private ZonedChunk getChunk(Vector2d chunkId) {
