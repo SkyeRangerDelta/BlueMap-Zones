@@ -17,6 +17,13 @@ public class ConfigHandler {
   /** Section in BMZ-NoticeExclusions.yml mapping a player UUID to a NoticeType id. */
   private static final String NOTICES_PATH = "Notices";
 
+  /**
+   * What a legacy opt-out becomes on migration. Deliberately not OFF: a player who
+   * silently receives nothing cannot tell the plugin is running, so they land on the
+   * least intrusive type that still shows something.
+   */
+  private static final NoticeType MIGRATION_DEFAULT = NoticeType.CHAT;
+
   /** List in BMZ-Config.yml naming the BlueMap marker sets to build zones from. */
   private static final String MARKER_SETS_PATH = "Maps.marker-sets";
 
@@ -119,28 +126,45 @@ public class ConfigHandler {
   }
 
   /**
-   * @method migrateNoticeExclusions - Convert the legacy flat "Exclusions" list of UUIDs
-   *     into the "Notices" section, which maps each UUID to a notice type. Players who had
-   *     opted out become NoticeType.OFF; everyone else falls through to NoticeType.DEFAULT.
-   *     Safe to call repeatedly - it is a no-op once "Exclusions" is gone.
+   * @method migrateNoticeExclusions - Convert legacy opt-out lists of UUIDs into the
+   *     "Notices" section, which maps each UUID to a notice type. Handles both the old
+   *     "Exclusions" key and a hand-written "Notices" that was written as a YAML list
+   *     rather than a map. Migrated players get MIGRATION_DEFAULT rather than OFF, so a
+   *     silent plugin never looks like a broken one. Safe to call repeatedly.
    */
   private static void migrateNoticeExclusions() {
-    if (!noticeExclusionsConfFile.contains("Exclusions")) return;
+    List<String> legacyUuids = new ArrayList<>( noticeExclusionsConfFile.getStringList("Exclusions") );
+    String migratedFrom = "Exclusions";
 
-    List<String> legacyExclusions = noticeExclusionsConfFile.getStringList("Exclusions");
+    // "Notices:" written as a list is the shape the old Exclusions key used, and it
+    // reads back as no preference at all. Treat it as a legacy opt-out list.
+    if (noticeExclusionsConfFile.contains(NOTICES_PATH)
+        && !noticeExclusionsConfFile.isConfigurationSection(NOTICES_PATH)) {
+      List<String> strayUuids = noticeExclusionsConfFile.getStringList(NOTICES_PATH);
 
-    for (String uuid : legacyExclusions) {
+      Log.warning(NOTICES_PATH + " was a list, not a map of UUID to notice type. "
+          + "Converting " + strayUuids.size() + " entry/entries.");
+
+      legacyUuids.addAll(strayUuids);
+      migratedFrom = migratedFrom + " and a malformed " + NOTICES_PATH;
+      noticeExclusionsConfFile.set(NOTICES_PATH, null);
+    }
+
+    if (legacyUuids.isEmpty()) {
+      noticeExclusionsConfFile.set("Exclusions", null);
+      return;
+    }
+
+    for (String uuid : legacyUuids) {
       // Do not clobber a preference that already exists in the new format.
       if (noticeExclusionsConfFile.contains(NOTICES_PATH + "." + uuid)) continue;
-      noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, NoticeType.OFF.getId());
+      noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, MIGRATION_DEFAULT.getId());
     }
 
     noticeExclusionsConfFile.set("Exclusions", null);
 
-    if (!legacyExclusions.isEmpty()) {
-      Log.info("Migrated " + legacyExclusions.size() + " notice exclusion(s) to the "
-          + NOTICES_PATH + " format.");
-    }
+    Log.info("Migrated " + legacyUuids.size() + " notice preference(s) from " + migratedFrom
+        + " to " + MIGRATION_DEFAULT.getId() + ".");
   }
 
   /**
