@@ -1,7 +1,9 @@
 package net.pldyn.bluemapzones;
 
 import de.bluecolored.bluemap.api.BlueMapAPI;
+import de.bluecolored.bluemap.api.BlueMapMap;
 import net.pldyn.bluemapzones.commands.generateCommand;
+import net.pldyn.bluemapzones.commands.markerSetCommand;
 import net.pldyn.bluemapzones.commands.reloadConfCommand;
 import net.pldyn.bluemapzones.commands.toggleNoticeCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -66,6 +68,14 @@ public final class BlueMap_Zones extends JavaPlugin {
       getCommand( "bmz-reload-conf" ) )
       .setExecutor( new reloadConfCommand() );
 
+    markerSetCommand markerSets = new markerSetCommand();
+    Objects.requireNonNull(
+      getCommand( "bmz-markerset" ) )
+      .setExecutor( markerSets );
+    Objects.requireNonNull(
+      getCommand( "bmz-markerset" ) )
+      .setTabCompleter( markerSets );
+
     getServer().getPluginManager().registerEvents(movementHandler, this);
     getServer().getPluginManager().registerEvents(toolHandler, this);
 
@@ -97,6 +107,21 @@ public final class BlueMap_Zones extends JavaPlugin {
 
   public BlueMapAPI getBlueMapAPI() {
     return bma;
+  }
+
+  /**
+   * @method getConfiguredMap - Resolve the BlueMap map named by Maps.name in the config.
+   * @return The matching map, or null if BlueMap is not ready yet or no map has that id.
+   */
+  public BlueMapMap getConfiguredMap() {
+    if (bma == null) return null;
+
+    String confMap = (String) ConfigHandler.getPluginConfFile().get( "Maps.name" );
+    for (BlueMapMap map : bma.getMaps()) {
+      if (map.getId().equals(confMap)) return map;
+    }
+
+    return null;
   }
 
   public static BlueMap_Zones getInstance() {

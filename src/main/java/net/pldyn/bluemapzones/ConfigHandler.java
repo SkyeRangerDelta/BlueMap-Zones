@@ -17,6 +17,9 @@ public class ConfigHandler {
   /** Section in BMZ-NoticeExclusions.yml mapping a player UUID to a NoticeType id. */
   private static final String NOTICES_PATH = "Notices";
 
+  /** List in BMZ-Config.yml naming the BlueMap marker sets to build zones from. */
+  private static final String MARKER_SETS_PATH = "Maps.marker-sets";
+
   private static File confFile;
   private static FileConfiguration pluginConfFile;
 
@@ -146,6 +149,37 @@ public class ConfigHandler {
    */
   public static List<String> getMarkerSets() {
     return pluginConfFile.getStringList("Maps.marker-sets");
+  }
+
+  /**
+   * @method addMarkerSet - Add a marker set id to Maps.marker-sets and persist it.
+   * @param markerSetId The BlueMap marker set id to add.
+   * @return true if it was added, false if it was already configured.
+   */
+  public static boolean addMarkerSet(String markerSetId) {
+    List<String> markerSets = getMarkerSets();
+    if (markerSets.contains(markerSetId)) return false;
+
+    markerSets.add(markerSetId);
+    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
+    savePluginConfFile();
+
+    return true;
+  }
+
+  /**
+   * @method removeMarkerSet - Remove a marker set id from Maps.marker-sets and persist it.
+   * @param markerSetId The BlueMap marker set id to remove.
+   * @return true if it was removed, false if it was not configured.
+   */
+  public static boolean removeMarkerSet(String markerSetId) {
+    List<String> markerSets = getMarkerSets();
+    if (!markerSets.remove(markerSetId)) return false;
+
+    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
+    savePluginConfFile();
+
+    return true;
   }
 
   /**
