@@ -20,6 +20,14 @@ public class ToolHandler implements Listener {
   public ToolHandler(ArrayList<ZonedShape> zonedShapes) {
     this.zonedShapes = zonedShapes;
   }
+
+  /**
+   * @method setZonedShapes - Point the compass tool at the latest generation.
+   * @param zonedShapes The shapes the generator produced.
+   */
+  public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
+    this.zonedShapes = zonedShapes;
+  }
   @EventHandler
   public void onPlayerUseTool(PlayerInteractEvent e) {
     Player pc = e.getPlayer();

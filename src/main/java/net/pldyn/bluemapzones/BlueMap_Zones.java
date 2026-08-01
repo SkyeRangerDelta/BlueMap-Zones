@@ -93,16 +93,25 @@ public final class BlueMap_Zones extends JavaPlugin {
 //  }
 
   public void generateZones() {
-    zonedShapes.clear();
+    // Deliberately does not clear the live zones here. The existing zones stay
+    // usable until the new generation finishes and hands over a replacement.
     runningGeneration = true;
     new ZoneGenerator(bma, this).start();
     Log.info("Zone generation started!");
   }
 
-  public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
-    this.zonedShapes.clear();
-    this.zonedShapes = zonedShapes;
-    movementHandler.setZonedShapes( zonedShapes );
+  /**
+   * @method setZonedShapes - Publish a completed generation to everything that reads zones.
+   * @param newShapes The shapes the generator produced.
+   */
+  public void setZonedShapes(ArrayList<ZonedShape> newShapes) {
+    // Copy rather than alias. The generator owns its own list, and previously
+    // this method cleared the very list it was being handed, wiping every
+    // regeneration after the first.
+    this.zonedShapes = new ArrayList<>( newShapes );
+
+    movementHandler.setZonedShapes( this.zonedShapes );
+    toolHandler.setZonedShapes( this.zonedShapes );
   }
 
   public BlueMapAPI getBlueMapAPI() {

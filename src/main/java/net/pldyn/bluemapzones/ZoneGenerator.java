@@ -20,7 +20,9 @@ import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSets;
 
 public class ZoneGenerator extends Thread {
   private static final Logger Log = Logger.getLogger("BM Zones");
-  private static final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
+  // Per-generation, NOT static. A shared static list let one run's results be
+  // cleared out from under a later run.
+  private final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
   private final BlueMapAPI blueMapAPI;
   private final BlueMap_Zones plugin;
 
@@ -100,8 +102,16 @@ public class ZoneGenerator extends Thread {
       Log.info("Thinking about shape " + ++shapeCount + " of " + setMarkers.size());
       String key = entry.getKey();
       Marker value = entry.getValue();
-      assert false;
-      zonedShapes.add(catalogMarker(key, value, zonedShapes));
+
+      // catalogMarker returns null for anything that is not a ShapeMarker
+      // (POIs, lines, extrusions). Those must not enter the zone list.
+      ZonedShape cataloged = catalogMarker(key, value, zonedShapes);
+      if (cataloged == null) {
+        Log.info("Skipping '" + key + "' - not a shape marker.");
+        continue;
+      }
+
+      zonedShapes.add(cataloged);
     }
   }
 
@@ -327,6 +337,12 @@ public class ZoneGenerator extends Thread {
     MarkerSet objectiveSet = findMarkerSets(workingMap);
     if (objectiveSet == null) {
       Log.warning( "Couldn't find the marker set to load!" );
+
+      // An empty marker-sets list is a deliberate "no zones" state, so publish
+      // that. Other failures are errors, and leave the existing zones alone
+      // rather than wiping them over a transient problem.
+      if (getMarkerSets().isEmpty()) plugin.setZonedShapes( new ArrayList<>() );
+
       return;
     }
 

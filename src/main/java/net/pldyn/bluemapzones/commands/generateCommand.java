@@ -14,6 +14,16 @@ public class generateCommand implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         BlueMap_Zones plugin = BlueMap_Zones.getInstance();
+
+        // This command takes no arguments; it always rebuilds from the configured
+        // marker sets. Say so rather than silently ignoring what was typed.
+        if ( args.length > 0 ) {
+            send(sender, "/bmz-generate takes no arguments - it rebuilds from every "
+                + "configured marker set. Use /bmz-markerset to change them.",
+                NamedTextColor.RED);
+            return true;
+        }
+
         if ( plugin.isGenerating() ) {
             send(sender, "Generation already in progress!", NamedTextColor.RED);
             return true;
