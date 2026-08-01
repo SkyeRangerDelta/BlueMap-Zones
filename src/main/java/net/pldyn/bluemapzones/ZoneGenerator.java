@@ -45,16 +45,6 @@ public class ZoneGenerator extends Thread {
 
   private MarkerSet findMarkerSets(BlueMapMap world) {
     List<String> configuredSets = getMarkerSets();
-
-    // An unconfigured server has "marker-sets: []", which would otherwise blow up
-    // on getFirst() and kill this thread.
-    if (configuredSets.isEmpty()) {
-      Log.warning("No marker sets are configured. Add the id of a BlueMap marker set to "
-          + "Maps.marker-sets in BMZ-Config.yml, then run /bmz-generate.");
-      return null;
-    }
-
-    String markerID = configuredSets.getFirst();
     Map<String, MarkerSet> markerSets = world.getMarkerSets();
 
     if (markerSets.isEmpty()) {
@@ -62,6 +52,17 @@ public class ZoneGenerator extends Thread {
           + "BlueMap before generating zones.");
       return null;
     }
+
+    // An unconfigured server has "marker-sets: []", which would otherwise blow up
+    // on getFirst() and kill this thread.
+    if (configuredSets.isEmpty()) {
+      Log.warning("No marker sets are configured. Add one of these ids to Maps.marker-sets "
+          + "in BMZ-Config.yml, then run /bmz-generate: "
+          + String.join(", ", markerSets.keySet()));
+      return null;
+    }
+
+    String markerID = configuredSets.getFirst();
 
     if (!markerSets.containsKey(markerID)) {
       Log.warning("Marker set '" + markerID + "' is not available on map '" + world.getId()
