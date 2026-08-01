@@ -18,7 +18,9 @@ import static net.pldyn.bluemapzones.ConfigHandler.getNoticeType;
 import static net.pldyn.bluemapzones.ConfigHandler.setNoticeType;
 import static net.pldyn.bluemapzones.MessageHandler.send;
 
-public class toggleNoticeCommand implements TabExecutor {
+public class toggleNoticeCommand implements CommandExecutor, TabExecutor {
+
+  private final BlueMap_Zones plugin = BlueMap_Zones.getInstance();
 
   @Override
   public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
@@ -81,5 +83,16 @@ public class toggleNoticeCommand implements TabExecutor {
     if (args.length != 1) return new ArrayList<>();
 
     return StringUtil.copyPartialMatches( args[0], NoticeType.ids(), new ArrayList<>() );
+  }
+
+  @Override
+  public @Nullable List<String> onTabComplete( @NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
+    List<String> completions = new ArrayList<>();
+
+    completions.add( "off" );
+    completions.add( "on" );
+    completions.add( "chat" );
+
+    return completions;
   }
 }
