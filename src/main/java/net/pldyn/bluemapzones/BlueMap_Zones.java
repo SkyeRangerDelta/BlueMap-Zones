@@ -52,9 +52,13 @@ public final class BlueMap_Zones extends JavaPlugin {
     movementHandler = new MovementHandler(zonedShapes);
     toolHandler = new ToolHandler(zonedShapes);
 
+    generateCommand generate = new generateCommand();
     Objects.requireNonNull(
       getCommand( "bmz-generate" ) )
-      .setExecutor( new generateCommand() );
+      .setExecutor( generate );
+    Objects.requireNonNull(
+      getCommand( "bmz-generate" ) )
+      .setTabCompleter( generate );
 
     toggleNoticeCommand toggleNotices = new toggleNoticeCommand();
     Objects.requireNonNull(
@@ -64,9 +68,13 @@ public final class BlueMap_Zones extends JavaPlugin {
       getCommand( "bmz-toggle-notices" ) )
       .setTabCompleter( toggleNotices );
 
+    reloadConfCommand reloadConf = new reloadConfCommand();
     Objects.requireNonNull(
       getCommand( "bmz-reload-conf" ) )
-      .setExecutor( new reloadConfCommand() );
+      .setExecutor( reloadConf );
+    Objects.requireNonNull(
+      getCommand( "bmz-reload-conf" ) )
+      .setTabCompleter( reloadConf );
 
     markerSetCommand markerSets = new markerSetCommand();
     Objects.requireNonNull(
