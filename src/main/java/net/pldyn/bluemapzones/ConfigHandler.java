@@ -14,6 +14,19 @@ import java.util.logging.Logger;
 public class ConfigHandler {
   private static final Logger Log = Logger.getLogger("BM Zones");
 
+  /** Section in BMZ-NoticeExclusions.yml mapping a player UUID to a NoticeType id. */
+  private static final String NOTICES_PATH = "Notices";
+
+  /**
+   * What a legacy opt-out becomes on migration. Deliberately not OFF: a player who
+   * silently receives nothing cannot tell the plugin is running, so they land on the
+   * least intrusive type that still shows something.
+   */
+  private static final NoticeType MIGRATION_DEFAULT = NoticeType.CHAT;
+
+  /** List in BMZ-Config.yml naming the BlueMap marker sets to build zones from. */
+  private static final String MARKER_SETS_PATH = "Maps.marker-sets";
+
   private static File confFile;
   private static FileConfiguration pluginConfFile;
 
@@ -108,8 +121,50 @@ public class ConfigHandler {
     pluginConfFile.addDefault("Maps.marker-sets", new ArrayList<String>());
     savePluginConfFile();
 
-    noticeExclusionsConfFile.addDefault("Exclusions", new ArrayList<String>());
+    migrateNoticeExclusions();
     saveNoticeExclusionsConf();
+  }
+
+  /**
+   * @method migrateNoticeExclusions - Convert legacy opt-out lists of UUIDs into the
+   *     "Notices" section, which maps each UUID to a notice type. Handles both the old
+   *     "Exclusions" key and a hand-written "Notices" that was written as a YAML list
+   *     rather than a map. Migrated players get MIGRATION_DEFAULT rather than OFF, so a
+   *     silent plugin never looks like a broken one. Safe to call repeatedly.
+   */
+  private static void migrateNoticeExclusions() {
+    List<String> legacyUuids = new ArrayList<>( noticeExclusionsConfFile.getStringList("Exclusions") );
+    String migratedFrom = "Exclusions";
+
+    // "Notices:" written as a list is the shape the old Exclusions key used, and it
+    // reads back as no preference at all. Treat it as a legacy opt-out list.
+    if (noticeExclusionsConfFile.contains(NOTICES_PATH)
+        && !noticeExclusionsConfFile.isConfigurationSection(NOTICES_PATH)) {
+      List<String> strayUuids = noticeExclusionsConfFile.getStringList(NOTICES_PATH);
+
+      Log.warning(NOTICES_PATH + " was a list, not a map of UUID to notice type. "
+          + "Converting " + strayUuids.size() + " entry/entries.");
+
+      legacyUuids.addAll(strayUuids);
+      migratedFrom = migratedFrom + " and a malformed " + NOTICES_PATH;
+      noticeExclusionsConfFile.set(NOTICES_PATH, null);
+    }
+
+    if (legacyUuids.isEmpty()) {
+      noticeExclusionsConfFile.set("Exclusions", null);
+      return;
+    }
+
+    for (String uuid : legacyUuids) {
+      // Do not clobber a preference that already exists in the new format.
+      if (noticeExclusionsConfFile.contains(NOTICES_PATH + "." + uuid)) continue;
+      noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, MIGRATION_DEFAULT.getId());
+    }
+
+    noticeExclusionsConfFile.set("Exclusions", null);
+
+    Log.info("Migrated " + legacyUuids.size() + " notice preference(s) from " + migratedFrom
+        + " to " + MIGRATION_DEFAULT.getId() + ".");
   }
 
   /**
@@ -118,6 +173,37 @@ public class ConfigHandler {
    */
   public static List<String> getMarkerSets() {
     return pluginConfFile.getStringList("Maps.marker-sets");
+  }
+
+  /**
+   * @method addMarkerSet - Add a marker set id to Maps.marker-sets and persist it.
+   * @param markerSetId The BlueMap marker set id to add.
+   * @return true if it was added, false if it was already configured.
+   */
+  public static boolean addMarkerSet(String markerSetId) {
+    List<String> markerSets = getMarkerSets();
+    if (markerSets.contains(markerSetId)) return false;
+
+    markerSets.add(markerSetId);
+    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
+    savePluginConfFile();
+
+    return true;
+  }
+
+  /**
+   * @method removeMarkerSet - Remove a marker set id from Maps.marker-sets and persist it.
+   * @param markerSetId The BlueMap marker set id to remove.
+   * @return true if it was removed, false if it was not configured.
+   */
+  public static boolean removeMarkerSet(String markerSetId) {
+    List<String> markerSets = getMarkerSets();
+    if (!markerSets.remove(markerSetId)) return false;
+
+    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
+    savePluginConfFile();
+
+    return true;
   }
 
   /**
@@ -161,38 +247,31 @@ public class ConfigHandler {
   }
 
   /**
-   * @method addNoticeExclusion - Add a UUID to the notice exclusions list.
-   * @param uuid
+   * @method getNoticeType - Get the notice type stored for a player.
+   * @param uuid The player's UUID.
+   * @return The stored type, or NoticeType.DEFAULT if none is set or the stored
+   *     value is not recognised.
    */
-  public static void addNoticeExclusion(UUID uuid) {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    exclusions.add(uuid.toString());
-    noticeExclusionsConfFile.set("Exclusions", exclusions);
-    saveNoticeExclusionsConf();
-  }
+  public static NoticeType getNoticeType(UUID uuid) {
+    String stored = noticeExclusionsConfFile.getString(NOTICES_PATH + "." + uuid);
+    NoticeType type = NoticeType.fromId(stored);
 
-  /**
-   * @method removeNoticeExclusion - Remove a UUID from the notice exclusions list.
-   * @param uuid
-   */
-  public static void removeNoticeExclusion(UUID uuid) {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    exclusions.remove(uuid.toString());
-    noticeExclusionsConfFile.set("Exclusions", exclusions);
-    saveNoticeExclusionsConf();
-  }
-
-  /**
-   * @method getNoticeExclusions - Get the list of UUIDs to exclude from notices.
-   * @return {List<UUID>}
-   */
-  public static List<UUID> getNoticeExclusions() {
-    List<String> exclusions = noticeExclusionsConfFile.getStringList("Exclusions");
-    List<UUID> uuidList = new ArrayList<>();
-    for (String exclusion : exclusions) {
-      uuidList.add(UUID.fromString(exclusion));
+    if (stored != null && type == null) {
+      Log.warning("Unrecognised notice type '" + stored + "' for " + uuid
+          + "; falling back to " + NoticeType.DEFAULT.getId() + ".");
     }
-    return uuidList;
+
+    return type == null ? NoticeType.DEFAULT : type;
+  }
+
+  /**
+   * @method setNoticeType - Store the notice type for a player and persist it.
+   * @param uuid The player's UUID.
+   * @param type The type to store.
+   */
+  public static void setNoticeType(UUID uuid, NoticeType type) {
+    noticeExclusionsConfFile.set(NOTICES_PATH + "." + uuid, type.getId());
+    saveNoticeExclusionsConf();
   }
 
   /**
