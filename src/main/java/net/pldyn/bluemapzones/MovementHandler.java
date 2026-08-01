@@ -263,6 +263,23 @@ public class MovementHandler implements Listener {
     this.zonedShapes = zonedShapes;
   }
 
+  /**
+   * @method resolveAreaName - Work out the display name for a chunk, using the same
+   *     boundary lookup and ray cast that drives zone notices. Only boundary chunks are
+   *     stored, so an interior chunk has to be resolved by casting rays.
+   * @param chunkId The chunk to identify.
+   * @return The zone or boundary name, or the configured wilderness name.
+   */
+  public String resolveAreaName(Vector2d chunkId) {
+    ZonedChunk chunk = getChunk( chunkId );
+    if (chunk != null) return chunk.getName();
+
+    ZonedShape zone = castRayInAllDirections( chunkId );
+    if (zone != null) return zone.getLabel();
+
+    return WILDERNESS;
+  }
+
   private void printNewLocation(Player pc, String chunkName, boolean isBoundary, Vector2d chunkId) {
 
     if ( isBoundary ) return;

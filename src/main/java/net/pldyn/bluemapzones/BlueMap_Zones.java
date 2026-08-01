@@ -50,7 +50,9 @@ public final class BlueMap_Zones extends JavaPlugin {
 
     UUID = java.util.UUID.randomUUID();
     movementHandler = new MovementHandler(zonedShapes);
-    toolHandler = new ToolHandler(zonedShapes);
+    // Resolves zones through movementHandler, so it holds no shape list of its own
+    // and cannot go stale after a regeneration.
+    toolHandler = new ToolHandler();
 
     generateCommand generate = new generateCommand();
     Objects.requireNonNull(
@@ -119,7 +121,6 @@ public final class BlueMap_Zones extends JavaPlugin {
     this.zonedShapes = new ArrayList<>( newShapes );
 
     movementHandler.setZonedShapes( this.zonedShapes );
-    toolHandler.setZonedShapes( this.zonedShapes );
   }
 
   public BlueMapAPI getBlueMapAPI() {
