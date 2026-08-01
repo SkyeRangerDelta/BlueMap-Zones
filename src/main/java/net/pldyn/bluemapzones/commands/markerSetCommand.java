@@ -95,6 +95,16 @@ public class markerSetCommand implements TabExecutor {
     }
 
     send( sender, "Added marker set '" + markerSetId + "'.", NamedTextColor.GREEN );
+
+    // ZoneGenerator only builds configuredSets.getFirst(), so anything beyond the
+    // first entry is stored but never used. Say so rather than implying it works.
+    List<String> configured = getMarkerSets();
+    if (configured.size() > 1) {
+      send( sender, "Heads up: only the first configured marker set ('"
+          + configured.getFirst() + "') is currently built, so '" + markerSetId
+          + "' will be stored but not used yet.", NamedTextColor.YELLOW );
+    }
+
     regenerate( sender );
   }
 
