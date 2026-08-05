@@ -22,7 +22,9 @@ public class ZoneGenerator extends Thread {
   private static final Logger Log = Logger.getLogger("BM Zones");
   // Per-generation, NOT static. A shared static list let one run's results be
   // cleared out from under a later run.
-  private final ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
+  // Keyed by level: shapes only ever interact with other shapes at the same level,
+  // so a city nested inside a state never contends with it.
+  private final TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel = new TreeMap<>();
   private final BlueMapAPI blueMapAPI;
   private final BlueMap_Zones plugin;
 
@@ -31,51 +33,69 @@ public class ZoneGenerator extends Thread {
     this.plugin = plugin;
   }
 
+  /**
+   * @method findConfMaps - Resolve the configured map, reporting what went wrong if it
+   *     cannot be found. Resolution itself lives on the plugin so the marker set command
+   *     and the generator cannot disagree about which map is in play.
+   * @param loadedWorlds Every map BlueMap currently has loaded.
+   * @return The configured map, or null.
+   */
   private BlueMapMap findConfMaps(Collection<BlueMapMap> loadedWorlds) {
-    String confWorld = (String) ConfigHandler.getPluginConfFile().get("Maps.name");
-    for (BlueMapMap m : loadedWorlds) {
-      if (m.getId().equals(confWorld)) {
-        Log.info("Found an operating world. (" + m.getName() + ")");
-        return m;
-      }
+    BlueMapMap configured = plugin.getConfiguredMap();
+
+    if (configured != null) {
+      Log.info("Found an operating world. (" + configured.getName() + ")");
+      return configured;
     }
 
+    String confWorld = (String) ConfigHandler.getPluginConfFile().get("Maps.name");
     Log.warning("No BlueMap map has the id '" + confWorld + "'. Set Maps.name in "
         + "BMZ-Config.yml to one of: " + describeIds(loadedWorlds));
     return null;
   }
 
-  private MarkerSet findMarkerSets(BlueMapMap world) {
-    List<String> configuredSets = getMarkerSets();
-    Map<String, MarkerSet> markerSets = world.getMarkerSets();
+  /**
+   * @method resolveMarkerSets - Match configured marker set ids against what BlueMap
+   *     actually has on the map. Configured sets that no longer exist are dropped from
+   *     the config so they stop being retried on every generation.
+   * @param world The map being generated.
+   * @return The resolvable sets, in configured order.
+   */
+  private Map<String, MarkerSet> resolveMarkerSets(BlueMapMap world) {
+    Map<String, MarkerSet> resolved = new LinkedHashMap<>();
+    Map<String, MarkerSet> available = world.getMarkerSets();
+    Map<String, Integer> configured = ConfigHandler.getMarkerSetLevels();
 
-    if (markerSets.isEmpty()) {
+    if (available.isEmpty()) {
       Log.warning("Map '" + world.getId() + "' has no marker sets at all. Create one in "
           + "BlueMap before generating zones.");
-      return null;
+      return resolved;
     }
 
-    // An unconfigured server has "marker-sets: []", which would otherwise blow up
-    // on getFirst() and kill this thread.
-    if (configuredSets.isEmpty()) {
+    if (configured.isEmpty()) {
       Log.warning("No marker sets are configured. Add one of these ids to Maps.marker-sets "
           + "in BMZ-Config.yml, then run /bmz-generate: "
-          + String.join(", ", markerSets.keySet()));
-      return null;
+          + String.join(", ", available.keySet()));
+      return resolved;
     }
 
-    String markerID = configuredSets.getFirst();
+    for (String markerSetId : configured.keySet()) {
+      MarkerSet markerSet = available.get(markerSetId);
 
-    if (!markerSets.containsKey(markerID)) {
-      Log.warning("Marker set '" + markerID + "' is not available on map '" + world.getId()
-          + "'. Available marker sets: " + String.join(", ", markerSets.keySet()));
-      return null;
+      if (markerSet == null) {
+        Log.warning("Marker set '" + markerSetId + "' is not on map '" + world.getId()
+            + "' and has been removed from the config. Available: "
+            + String.join(", ", available.keySet()));
+        ConfigHandler.removeMarkerSet(markerSetId);
+        continue;
+      }
+
+      Log.info("Found marker set '" + markerSetId + "' (" + markerSet.getLabel()
+          + ") at level " + configured.get(markerSetId) + ".");
+      resolved.put(markerSetId, markerSet);
     }
 
-    MarkerSet mSet = markerSets.get(markerID);
-
-    if (mSet != null) Log.info("Found the configured marker set. (" + mSet.getLabel() + ")");
-    return mSet;
+    return resolved;
   }
 
   /**
@@ -94,32 +114,42 @@ public class ZoneGenerator extends Thread {
     return String.join(", ", ids);
   }
 
-  private void handleMarkerSet(MarkerSet markerSet) {
+  /**
+   * @method handleMarkerSet - Catalog every shape in a marker set into its level.
+   * @param markerSet The BlueMap marker set to read.
+   * @param markerSetId The set's id, recorded on each shape.
+   * @param level The level the set sits at.
+   */
+  private void handleMarkerSet(MarkerSet markerSet, String markerSetId, int level) {
     Map<String, Marker> setMarkers = markerSet.getMarkers();
-//    Log.info("Cataloging " + setMarkers.size() + " markers.");
+    ArrayList<ZonedShape> levelShapes =
+        zonesByLevel.computeIfAbsent(level, key -> new ArrayList<>());
+
     int shapeCount = 0;
     for (Map.Entry<String, Marker> entry : setMarkers.entrySet()) {
-      Log.info("Thinking about shape " + ++shapeCount + " of " + setMarkers.size());
+      Log.info("[" + markerSetId + " L" + level + "] Thinking about shape "
+          + ++shapeCount + " of " + setMarkers.size());
       String key = entry.getKey();
       Marker value = entry.getValue();
 
       // catalogMarker returns null for anything that is not a ShapeMarker
       // (POIs, lines, extrusions). Those must not enter the zone list.
-      ZonedShape cataloged = catalogMarker(key, value, zonedShapes);
+      ZonedShape cataloged = catalogMarker(key, value, markerSetId, level);
       if (cataloged == null) {
         Log.info("Skipping '" + key + "' - not a shape marker.");
         continue;
       }
 
-      zonedShapes.add(cataloged);
+      levelShapes.add(cataloged);
     }
   }
 
-  private ZonedShape catalogMarker(String k, Marker m, ArrayList<ZonedShape> chunkList) {
+  private ZonedShape catalogMarker(String k, Marker m, String markerSetId, int level) {
     if (!(m instanceof ShapeMarker shapeMarker)) return null;
     Shape markerShape = shapeMarker.getShape();
     Vector2d[] markerPoints = markerShape.getPoints();
-    ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape, ((ShapeMarker) m).getShapeY());
+    ZonedShape newZone = new ZonedShape(m.getLabel(), markerShape,
+        ((ShapeMarker) m).getShapeY(), markerSetId, level);
 
 //    Log.info("Processing " + newZone.getLabel() + " with " + markerPoints.length
 //        + " vertex point(s).");
@@ -185,8 +215,8 @@ public class ZoneGenerator extends Thread {
   }
 
   private ZonedChunk addChunk(ZonedChunk newChunk, Vector2d chId, ZonedShape newZone) {
-    //Is conflicted also owned by another shape?
-    ArrayList<ZonedShape> conflictedOwners = conflictedChunk(chId);
+    //Is conflicted also owned by another shape at the same level?
+    ArrayList<ZonedShape> conflictedOwners = conflictedChunk(newZone.getLevel(), chId);
     if (!conflictedOwners.isEmpty()) {
       for (ZonedShape owner : conflictedOwners) {
         newChunk = owner.getOwnedChunks().get(chId);
@@ -285,18 +315,29 @@ public class ZoneGenerator extends Thread {
   }
 
   private void generateShapeInteriors() {
-    for (ZonedShape shape : zonedShapes) {
-      shape.doInteriorGeneration();
+    for (ArrayList<ZonedShape> levelShapes : zonesByLevel.values()) {
+      for (ZonedShape shape : levelShapes) {
+        shape.doInteriorGeneration();
+      }
     }
   }
 
-  private ArrayList<ZonedShape> conflictedChunk(Vector2d zonedChunkId) {
+  /**
+   * @method conflictedChunk - Find shapes at the same level that already own a chunk.
+   *     Scoped to one level deliberately: a city overlapping its containing state is
+   *     nesting, not a border, and must not be flagged as a conflict.
+   * @param level The level to search within.
+   * @param zonedChunkId The chunk to test.
+   * @return Shapes at that level already owning the chunk.
+   */
+  private ArrayList<ZonedShape> conflictedChunk(int level, Vector2d zonedChunkId) {
     ArrayList<ZonedShape> conflictedOwners = new ArrayList<>();
-    for (ZonedShape zonedShape : zonedShapes) {
+
+    for (ZonedShape zonedShape : zonesByLevel.getOrDefault(level, new ArrayList<>())) {
       HashMap<Vector2d, ZonedChunk> ownedChunks = zonedShape.getOwnedChunks();
       if (ownedChunks.containsKey(zonedChunkId)) {
         conflictedOwners.add(zonedShape);
-      };
+      }
     }
 
     return conflictedOwners;
@@ -334,22 +375,26 @@ public class ZoneGenerator extends Thread {
       return;
     }
 
-    MarkerSet objectiveSet = findMarkerSets(workingMap);
-    if (objectiveSet == null) {
-      Log.warning( "Couldn't find the marker set to load!" );
+    Map<String, MarkerSet> objectiveSets = resolveMarkerSets(workingMap);
 
-      // An empty marker-sets list is a deliberate "no zones" state, so publish
-      // that. Other failures are errors, and leave the existing zones alone
-      // rather than wiping them over a transient problem.
-      if (getMarkerSets().isEmpty()) plugin.setZonedShapes( new ArrayList<>() );
+    if (objectiveSets.isEmpty()) {
+      Log.warning( "No usable marker sets; nothing to generate." );
+
+      // No configured sets is a deliberate "no zones" state, so publish that. Other
+      // failures are errors, and leave the existing zones alone rather than wiping
+      // them over a transient problem.
+      if (getMarkerSets().isEmpty()) plugin.setZonesByLevel( new TreeMap<>() );
 
       return;
     }
 
-    zonedShapes.clear();
+    zonesByLevel.clear();
 
-    //Build shapes and their bounds
-    handleMarkerSet(objectiveSet);
+    //Build shapes and their bounds, one marker set at a time
+    for (Map.Entry<String, MarkerSet> entry : objectiveSets.entrySet()) {
+      int level = ConfigHandler.getMarkerSetLevel( entry.getKey() );
+      handleMarkerSet( entry.getValue(), entry.getKey(), level );
+    }
 
     //Build shape interiors
 //    generateShapeInteriors();
@@ -357,20 +402,30 @@ public class ZoneGenerator extends Thread {
     // Handle data on main thread
     handleDataOnMainThread();
 
-    // Get the number of processed chunks
+    // Get the number of processed shapes and chunks
+    int shapeCount = 0;
     int chunkCount = 0;
-    for (ZonedShape shape : zonedShapes) {
-      chunkCount += shape.getOwnedChunks().size();
+    for (Map.Entry<Integer, ArrayList<ZonedShape>> level : zonesByLevel.entrySet()) {
+      int levelChunks = 0;
+      for (ZonedShape shape : level.getValue()) {
+        levelChunks += shape.getOwnedChunks().size();
+      }
+
+      shapeCount += level.getValue().size();
+      chunkCount += levelChunks;
+
+      Log.info("Level " + level.getKey() + ": " + level.getValue().size() + " shape(s), "
+          + levelChunks + " chunk(s).");
     }
 
     Log.info("Generation complete.");
-    Log.info("Generation includes " + zonedShapes.size() + " shapes with a total of "
-        + chunkCount + " chunks.");
+    Log.info("Generation includes " + shapeCount + " shapes across " + zonesByLevel.size()
+        + " level(s) with a total of " + chunkCount + " chunks.");
 
     Component message = Component.text("Generation done!").color( NamedTextColor.GREEN );
     Bukkit.getServer().sendMessage( message );
 
     // The generating flag is cleared by run()'s finally block.
-    plugin.setZonedShapes( zonedShapes );
+    plugin.setZonesByLevel( zonesByLevel );
   }
 }

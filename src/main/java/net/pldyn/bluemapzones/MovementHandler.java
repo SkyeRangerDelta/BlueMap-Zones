@@ -11,6 +11,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.util.*;
 import java.util.logging.Logger;
@@ -21,14 +22,23 @@ public class MovementHandler implements Listener {
 
   private static final Logger Log = Logger.getLogger("BM Zones");
   private static final HashMap<Player, PCLocationHistory> playerLocations = new HashMap<>();
-  private ArrayList<ZonedShape> zonedShapes;
 
-  private static BlueMap_Zones BMZ = BlueMap_Zones.getInstance();
+  /** How far a ray travels, in chunks, before giving up on finding a boundary. */
+  private static final int RAY_LENGTH = 250;
+
+  /** A zone must be hit in all four cardinal directions to count as containing you. */
+  private static final int RAY_HITS_REQUIRED = 4;
+
+  private TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel;
 
   private static String WILDERNESS = (String) ConfigHandler.getPluginConfFile().get( "Wilderness-Name" );
 
-  public MovementHandler(ArrayList<ZonedShape> zonedShapes) {
-    this.zonedShapes = zonedShapes;
+  public MovementHandler(TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel) {
+    this.zonesByLevel = zonesByLevel;
+  }
+
+  public void setZonesByLevel(TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel) {
+    this.zonesByLevel = zonesByLevel;
   }
 
   @EventHandler
@@ -41,107 +51,147 @@ public class MovementHandler implements Listener {
     Location oldLocation = e.getFrom();
     Location newLocation = e.getTo();
 
-    Vector2d newChunkId = new Vector2d(Math.floorDiv(newLocation.getBlockX(), 16),
-        Math.floorDiv(newLocation.getBlockZ(), 16));
-
-    Vector2d oldChunkId = new Vector2d(Math.floorDiv(oldLocation.getBlockX(), 16),
-        Math.floorDiv(oldLocation.getBlockZ(), 16));
-
     if (!hasChangedChunks(oldLocation, newLocation)) return;
     if (!newLocation.getWorld().getName().equals(worldName)) return;
 
-    isNewZone( pc, newChunkId, oldChunkId );
+    Vector2d newChunkId = toChunkId( newLocation );
+
+    evaluateLocation( pc, newChunkId, true );
   }
 
   @EventHandler
   public void onPlayerJoin(PlayerJoinEvent e) {
     Player pc = e.getPlayer();
-    Location pcLocation = pc.getLocation();
-    Vector2d chunkLocationID = new Vector2d(Math.floorDiv(pcLocation.getBlockX(), 16),
-        Math.floorDiv(pcLocation.getBlockZ(), 16));
 
-    ZonedChunk chunk = getChunk(chunkLocationID); //Test if the chunk is on a boundary
-    ZonedShape zone = null;
-    PCLocationHistory loginChunkData;
-
-    if ( chunk == null ) { // If not, run bresenham
-      zone = castRayInAllDirections( chunkLocationID );
-      if ( zone != null ) {
-        loginChunkData = new PCLocationHistory(
-            zone.getLabel(), zone.getLabel()
-        );
-      }
-      else {
-        loginChunkData = new PCLocationHistory(
-            WILDERNESS, WILDERNESS
-        );
-      }
-    }
-    else {
-      String cName = chunk.getName();
-      loginChunkData = new PCLocationHistory(
-          cName, cName
-      );
-    }
-
-    playerLocations.put(pc, loginChunkData);
-    printNewLocation( pc, loginChunkData.getLastAreaName(), false, chunkLocationID );
+    // Seed the history from scratch, then announce where they landed.
+    playerLocations.put( pc, new PCLocationHistory() );
+    evaluateLocation( pc, toChunkId( pc.getLocation() ), true );
   }
 
-  private void isNewZone(Player pc, Vector2d chunkId, Vector2d lastChunkId) {
-    PCLocationHistory pcHistory = playerLocations.get(pc);
-    String pcLastZone = pcHistory.getLastAreaName();
-    String pcLastNonConflictedZone = pcHistory.getLastNonConflictedAreaName();
+  @EventHandler
+  public void onPlayerQuit(PlayerQuitEvent e) {
+    // Without this the map holds a strong reference to every player who has ever
+    // joined, for the lifetime of the server.
+    playerLocations.remove( e.getPlayer() );
+  }
 
-    ZonedChunk chunk = getChunk(chunkId); //Determine if the chunk is owned by a zone
-    ZonedChunk lastChunk = getChunk(lastChunkId); //Determine if the last chunk is owned by a zone
+  /**
+   * @method evaluateLocation - Work out which zone the player occupies at every level,
+   *     update their history, and announce if anything changed.
+   * @param pc The player.
+   * @param chunkId The chunk they are now in.
+   * @param announce Whether a change should produce a notice.
+   */
+  private void evaluateLocation(Player pc, Vector2d chunkId, boolean announce) {
+    PCLocationHistory history =
+        playerLocations.computeIfAbsent( pc, key -> new PCLocationHistory() );
 
-    if (chunk == null) { // Not a boundary chunk (must be a ext or int chunk)
-      // Run bresenham to determine if inside a shape
-      ZonedShape zone = castRayInAllDirections(chunkId);
+    boolean changed = false;
+    boolean deepestConflicted = false;
 
-      if (zone == null) {
-        if (pcLastZone.equals(WILDERNESS)) return;
-        pcHistory.setLastAreaName(WILDERNESS);
-        printNewLocation(pc, WILDERNESS, false, chunkId);
+    // Broadest level first, so the last occupied level seen is the deepest.
+    for (Integer level : zonesByLevel.keySet()) {
+      Resolution resolved = resolveLevel( level, chunkId );
+
+      history.setAreaName( level, resolved.name );
+
+      if (resolved.conflicted) {
+        // Standing on a shared border. Leave the non-conflicted name alone so
+        // stepping back into the zone we came from does not re-announce.
+        deepestConflicted = true;
+        continue;
       }
-      else { // Inside a detected zone, therefore not a border - must be interior
-//        Log.info( "Zone: " + zone.getLabel() );
-        if (pcLastZone.equals(zone.getLabel())) return;
-        pcHistory.setLastAreaName(zone.getLabel());
 
-        // Check if the last zone was null or not. This determines if the last zone was a border zone or
-        // if they've warped in.
-        if ( lastChunk == null ) {
-          // Warped or joined oddly.
-          pcHistory.setLastNonConflictedAreaName(zone.getLabel());
-          printNewLocation( pc, zone.getLabel(), false, chunkId );
-        }
-        else {
-          // Last chunk is known. If it was owned by the same zone, return.
-          if ( lastChunk.getOwners().contains( zone ) && !lastChunk.isConflicted() ) return;
+      deepestConflicted = false;
 
-          // If the last chunk was a border chunk and the last non-conflicted chunk they were in
-          // was an owner in the border chunk, return.
-          if ( lastChunk.isConflicted() && Objects.equals( zone.getLabel(), pcLastNonConflictedZone ) ) return;
-
-          // Otherwise, print the new location.
-          printNewLocation( pc, zone.getLabel(), false, chunkId );
-        }
-
-        pcHistory.setLastNonConflictedAreaName(zone.getLabel());
+      if (!Objects.equals( resolved.name, history.getNonConflictedAreaName( level ) )) {
+        history.setNonConflictedAreaName( level, resolved.name );
+        changed = true;
       }
     }
-    else { // Owned by a zone (border chunk)
-      if (pcLastZone.equals(chunk.getName())) return;
-      pcHistory.setLastAreaName(chunk.getName());
 
-      if ( !chunk.isConflicted() ) {
-        pcHistory.setLastNonConflictedAreaName(chunk.getName());
-      }
+    if (!announce || !changed || deepestConflicted) return;
 
-      printNewLocation(pc, chunk.getName(), chunk.isConflicted(), chunkId);
+    sendNotice( pc, history );
+  }
+
+  /**
+   * @method resolveLevel - Identify the zone a chunk belongs to within one level.
+   *     Levels are resolved independently so a city nested inside a state does not
+   *     steal the state's rays.
+   * @param level The zone level to search.
+   * @param chunkId The chunk to identify.
+   * @return The resolved name (null when in no zone) and whether it is a shared border.
+   */
+  private Resolution resolveLevel(int level, Vector2d chunkId) {
+    ZonedChunk chunk = getChunk( level, chunkId );
+    if (chunk != null) return new Resolution( chunk.getName(), chunk.isConflicted() );
+
+    ZonedShape zone = castRayInAllDirections( level, chunkId );
+    if (zone != null) return new Resolution( zone.getLabel(), false );
+
+    return new Resolution( null, false );
+  }
+
+  /**
+   * @method sendNotice - Deliver the combined notice: the deepest zone the player is in,
+   *     with the next level up as context.
+   * @param pc The player.
+   * @param history Their per-level location history.
+   */
+  private void sendNotice(Player pc, PCLocationHistory history) {
+    List<String> occupied = new ArrayList<>();
+
+    for (Integer level : zonesByLevel.keySet()) {
+      String name = history.getAreaName( level );
+      if (name != null) occupied.add( name );
     }
+
+    String title = occupied.isEmpty() ? WILDERNESS : occupied.getLast();
+    String context = occupied.size() > 1 ? occupied.get( occupied.size() - 2 ) : null;
+
+    NoticeType noticeType = getNoticeType( pc.getUniqueId() );
+    if (noticeType == NoticeType.OFF) return;
+
+    if (noticeType.showsTitle()) {
+      Title areaTitle = Title.title(
+          Component.text( title ),
+          Component.text( context != null ? context : buildSubtitle( title ) )
+      );
+
+      pc.showTitle( areaTitle );
+      pc.playSound( pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f );
+    }
+
+    if (noticeType.showsChat()) {
+      String line = context != null
+          ? "Now entering " + title + ", " + context + "."
+          : "Now entering " + title + ".";
+
+      MessageHandler.send( pc, line, NamedTextColor.AQUA );
+    }
+  }
+
+  /**
+   * @method resolveAreaName - Public lookup used by the compass tool. Reports the
+   *     deepest zone the chunk belongs to.
+   * @param chunkId The chunk to identify.
+   * @return The zone or boundary name, or the configured wilderness name.
+   */
+  public String resolveAreaName(Vector2d chunkId) {
+    String deepest = null;
+
+    for (Integer level : zonesByLevel.keySet()) {
+      Resolution resolved = resolveLevel( level, chunkId );
+      if (resolved.name != null) deepest = resolved.name;
+    }
+
+    return deepest != null ? deepest : WILDERNESS;
+  }
+
+  private Vector2d toChunkId(Location location) {
+    return new Vector2d(Math.floorDiv(location.getBlockX(), 16),
+        Math.floorDiv(location.getBlockZ(), 16));
   }
 
   private boolean hasChangedChunks(Location oldLoc, Location newLoc) {
@@ -149,14 +199,15 @@ public class MovementHandler implements Listener {
         Math.floorDiv(newLoc.getBlockZ(), 16) != Math.floorDiv(oldLoc.getBlockZ(), 16);
   }
 
-
   /**
-   * @method runBresenham - Runs the Bresenham algorithm to determine the line between two points.
-   * @param start - The starting point.
-   * @param end - The ending point.
-   * @return ArrayList<Vector2d> - The list of chunk IDs between the two points.
+   * @method runBresenham - Walk a line of chunks, stopping at the first one owned by a
+   *     shape at the given level.
+   * @param level The zone level to test against.
+   * @param start The starting chunk.
+   * @param end The chunk to walk toward.
+   * @return The chunk ids walked, ending at the first owned chunk if one was hit.
    */
-  private ArrayList<Vector2d> runBresenham(Vector2d start, Vector2d end) {
+  private ArrayList<Vector2d> runBresenham(int level, Vector2d start, Vector2d end) {
     ArrayList<Vector2d> lineIds = new ArrayList<>();
 
     int x1 = start.getFloorX();
@@ -184,10 +235,9 @@ public class MovementHandler implements Listener {
 
     for (int i = 0; i <= dx; i++) {
       Vector2d currentId = new Vector2d(x, y);
-      lineIds.add(new Vector2d(x, y));
+      lineIds.add(currentId);
 
-      ZonedChunk chunk = getChunk(currentId);
-      if (chunk != null) {
+      if (getChunk(level, currentId) != null) {
         return lineIds;
       }
 
@@ -212,17 +262,16 @@ public class MovementHandler implements Listener {
   }
 
   /**
-   * @method castRayInAllDirections - Dispatches the ray in all directions and returns the zone if found.
-   * @param playerLocation - the chunk ID of where the player is.
-   * @return ZonedShape - the zone the player is in if any.
+   * @method castRayInAllDirections - Decide whether a chunk sits inside a shape at a
+   *     level by casting rays outward. Only boundary chunks are stored, so interiors
+   *     have to be inferred this way.
+   * @param level The zone level to test against.
+   * @param playerLocation The chunk the player is in.
+   * @return The containing shape, or null.
    */
-  private ZonedShape castRayInAllDirections(Vector2d playerLocation) {
-    ArrayList< ZonedShape > zones = new ArrayList<>();
-    HashMap< ZonedShape, Integer > zoneCount = new HashMap<>();
+  private ZonedShape castRayInAllDirections(int level, Vector2d playerLocation) {
+    HashMap<ZonedShape, Integer> zoneCount = new HashMap<>();
 
-//    Log.info( "Casting ray in all directions from " + playerLocation );
-
-    // Define the directions
     Vector2d[] directions = {
         new Vector2d( 0, 1 ),   // North
         new Vector2d( 0, - 1 ),  // South
@@ -231,81 +280,34 @@ public class MovementHandler implements Listener {
     };
 
     for ( Vector2d direction : directions ) {
-      Vector2d endPoint = playerLocation.add( direction.mul( 250 ) );
-//      Log.info( "Casting ray to " + endPoint );
-      ArrayList< Vector2d > rayCastResult = runBresenham( playerLocation, endPoint );
+      Vector2d endPoint = playerLocation.add( direction.mul( RAY_LENGTH ) );
+      ArrayList< Vector2d > rayCastResult = runBresenham( level, playerLocation, endPoint );
 
       for ( Vector2d chunkId : rayCastResult ) {
-        ZonedChunk chunk = getChunk( chunkId );
-        if ( chunk != null ) {
-          List<ZonedShape> owners = chunk.getOwners();
-          for ( ZonedShape zone : owners ) {
-            if ( zone != null ) {
-              zones.add(zone);
-              zoneCount.put(zone, zoneCount.getOrDefault(zone, 0) + 1);
-            }
-          }
+        ZonedChunk chunk = getChunk( level, chunkId );
+        if ( chunk == null ) continue;
+
+        for ( ZonedShape zone : chunk.getOwners() ) {
+          if ( zone != null ) zoneCount.merge( zone, 1, Integer::sum );
         }
       }
     }
 
-    // Check if any two zones are the same
-    for ( Map.Entry<ZonedShape, Integer> entry : zoneCount.entrySet()) {
-      if (entry.getValue() >= 4) {
-        return entry.getKey();
-      }
+    for ( Map.Entry<ZonedShape, Integer> entry : zoneCount.entrySet() ) {
+      if (entry.getValue() >= RAY_HITS_REQUIRED) return entry.getKey();
     }
 
     return null;
   }
 
-  public void setZonedShapes(ArrayList<ZonedShape> zonedShapes) {
-    this.zonedShapes = zonedShapes;
-  }
-
   /**
-   * @method resolveAreaName - Work out the display name for a chunk, using the same
-   *     boundary lookup and ray cast that drives zone notices. Only boundary chunks are
-   *     stored, so an interior chunk has to be resolved by casting rays.
-   * @param chunkId The chunk to identify.
-   * @return The zone or boundary name, or the configured wilderness name.
+   * @method getChunk - Look up a chunk within a single level.
+   * @param level The zone level to search.
+   * @param chunkId The chunk to find.
+   * @return The owned chunk, or null if no shape at that level owns it.
    */
-  public String resolveAreaName(Vector2d chunkId) {
-    ZonedChunk chunk = getChunk( chunkId );
-    if (chunk != null) return chunk.getName();
-
-    ZonedShape zone = castRayInAllDirections( chunkId );
-    if (zone != null) return zone.getLabel();
-
-    return WILDERNESS;
-  }
-
-  private void printNewLocation(Player pc, String chunkName, boolean isBoundary, Vector2d chunkId) {
-
-    if ( isBoundary ) return;
-
-//    Log.info("Player entered (" + chunkId.getX() + ", " + chunkId.getY() + ") - " + chunkName);
-
-    NoticeType noticeType = getNoticeType( pc.getUniqueId() );
-    if ( noticeType == NoticeType.OFF ) return;
-
-    if ( noticeType.showsTitle() ) {
-      Title newAreaTitle = Title.title(
-          Component.text(chunkName),
-          Component.text(buildSubtitle(chunkName))
-      );
-
-      pc.showTitle(newAreaTitle);
-      pc.playSound(pc.getLocation(), Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, 1.0f);
-    }
-
-    if ( noticeType.showsChat() ) {
-      MessageHandler.send( pc, "Now entering " + chunkName + ".", NamedTextColor.AQUA );
-    }
-  }
-
-  private ZonedChunk getChunk(Vector2d chunkId) {
-    for (ZonedShape zone : zonedShapes) {
+  private ZonedChunk getChunk(int level, Vector2d chunkId) {
+    for (ZonedShape zone : zonesByLevel.getOrDefault( level, new ArrayList<>() )) {
       HashMap<Vector2d, ZonedChunk> ownedChunks = zone.getOwnedChunks();
       if (ownedChunks.containsKey(chunkId)) return ownedChunks.get(chunkId);
     }
@@ -314,15 +316,13 @@ public class MovementHandler implements Listener {
   }
 
   private String buildSubtitle(String mainTitle) {
-    String subtitle = "";
-    for (int i = 0; i < mainTitle.length() + 10; i++) {
-      subtitle = subtitle.concat("_");
-    }
-
-    return subtitle;
+    return "_".repeat( mainTitle.length() + 10 );
   }
 
   public void reloadConfig() {
     WILDERNESS = (String) ConfigHandler.getPluginConfFile().get( "Wilderness-Name" );
   }
+
+  /** The outcome of identifying one chunk at one level. */
+  private record Resolution(String name, boolean conflicted) { }
 }

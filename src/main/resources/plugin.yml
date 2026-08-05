@@ -23,8 +23,8 @@ commands:
     usage: "/bmz-reload-conf"
     permission: "bluemapzones.reload"
   bmz-markerset:
-    description: "Manages which BlueMap marker sets zones are built from."
-    usage: "/bmz-markerset <add|remove|list> [marker-set]"
+    description: "Manages which BlueMap marker sets zones are built from, and their levels."
+    usage: "/bmz-markerset <add|remove|level|list> [marker-set] [level]"
     permission: "bluemapzones.markerset"
 permissions:
   bluemapzones.*:

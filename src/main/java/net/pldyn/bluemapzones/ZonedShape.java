@@ -14,15 +14,32 @@ public class ZonedShape extends ShapeMarker {
   public Vector2d maxChunk = getMaxChunk();
   public Vector2d minChunk = getMinChunk();
 
+  /** The BlueMap marker set this shape came from. */
+  private final String markerSetId;
+
+  /** The zone level this shape belongs to. Shapes only interact within a level. */
+  private final int level;
+
   /**
    * Constructor for a ZonedShape.
    * @param label The label of the shape.
    * @param shape The BlueMap shape type of the zone.
    * @param shapeY The Y level of the shape.
+   * @param markerSetId The marker set the shape came from.
+   * @param level The zone level the marker set sits at.
    */
-  public ZonedShape(String label, Shape shape, float shapeY) {
+  public ZonedShape(String label, Shape shape, float shapeY, String markerSetId, int level) {
     super(label, shape, shapeY);
-//    Log.info("Created a new zone shape.");
+    this.markerSetId = markerSetId;
+    this.level = level;
+  }
+
+  public String getMarkerSetId() {
+    return markerSetId;
+  }
+
+  public int getLevel() {
+    return level;
   }
 
   public HashMap<Vector2d, ZonedChunk> getOwnedChunks() {

@@ -1,13 +1,18 @@
 package net.pldyn.bluemapzones;
 
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -24,8 +29,15 @@ public class ConfigHandler {
    */
   private static final NoticeType MIGRATION_DEFAULT = NoticeType.CHAT;
 
-  /** List in BMZ-Config.yml naming the BlueMap marker sets to build zones from. */
+  /** Section in BMZ-Config.yml mapping a BlueMap marker set id to its level. */
   private static final String MARKER_SETS_PATH = "Maps.marker-sets";
+
+  /**
+   * Level applied to a marker set the admin has not levelled. Level 1 is the broadest
+   * tier, and higher numbers nest inside it. Everything defaulting here means an
+   * un-levelled config is a single flat zone space, matching pre-levels behaviour.
+   */
+  public static final int DEFAULT_MARKER_SET_LEVEL = 1;
 
   private static File confFile;
   private static FileConfiguration pluginConfFile;
@@ -121,6 +133,8 @@ public class ConfigHandler {
     pluginConfFile.addDefault("Maps.marker-sets", new ArrayList<String>());
     savePluginConfFile();
 
+    normalizeMarkerSets();
+
     migrateNoticeExclusions();
     saveNoticeExclusionsConf();
   }
@@ -168,27 +182,119 @@ public class ConfigHandler {
   }
 
   /**
-   * @method getMarkerSets - Get the list of marker sets for the plugin.
-   * @return {List<String>}
+   * @method normalizeMarkerSets - Accept Maps.marker-sets written either as a plain list
+   *     of ids or as a map of id to level, and store it as the map form. A plain list
+   *     means every set sits at DEFAULT_MARKER_SET_LEVEL, which is exactly the flat
+   *     single-space behaviour the plugin had before levels existed.
    */
-  public static List<String> getMarkerSets() {
-    return pluginConfFile.getStringList("Maps.marker-sets");
+  private static void normalizeMarkerSets() {
+    if (!pluginConfFile.contains(MARKER_SETS_PATH)) return;
+    if (pluginConfFile.isConfigurationSection(MARKER_SETS_PATH)) return;
+
+    List<String> flatSets = pluginConfFile.getStringList(MARKER_SETS_PATH);
+
+    Map<String, Object> levelled = new LinkedHashMap<>();
+    for (String markerSetId : flatSets) {
+      levelled.put(markerSetId, DEFAULT_MARKER_SET_LEVEL);
+    }
+
+    pluginConfFile.set(MARKER_SETS_PATH, levelled);
+    savePluginConfFile();
+
+    if (!flatSets.isEmpty()) {
+      Log.info("Converted " + flatSets.size() + " marker set(s) to the levelled format at "
+          + "level " + DEFAULT_MARKER_SET_LEVEL + ".");
+    }
   }
 
   /**
-   * @method addMarkerSet - Add a marker set id to Maps.marker-sets and persist it.
+   * @method getMarkerSetLevels - Every configured marker set with the level it sits at.
+   * @return An insertion-ordered map of marker set id to level. Sets with no explicit
+   *     level fall back to DEFAULT_MARKER_SET_LEVEL.
+   */
+  public static Map<String, Integer> getMarkerSetLevels() {
+    Map<String, Integer> levels = new LinkedHashMap<>();
+
+    ConfigurationSection section = pluginConfFile.getConfigurationSection(MARKER_SETS_PATH);
+    if (section == null) return levels;
+
+    for (String markerSetId : section.getKeys(false)) {
+      // A key with no value is a set the admin has not levelled yet.
+      levels.put(markerSetId, section.getInt(markerSetId, DEFAULT_MARKER_SET_LEVEL));
+    }
+
+    return levels;
+  }
+
+  /**
+   * @method getMarkerSets - Get the ids of every configured marker set.
+   * @return {List<String>}
+   */
+  public static List<String> getMarkerSets() {
+    return new ArrayList<>( getMarkerSetLevels().keySet() );
+  }
+
+  /**
+   * @method getMarkerSetsByLevel - Configured marker sets grouped by level, broadest first.
+   * @return A level-ordered map of level to the marker set ids at that level.
+   */
+  public static SortedMap<Integer, List<String>> getMarkerSetsByLevel() {
+    SortedMap<Integer, List<String>> byLevel = new TreeMap<>();
+
+    for (Map.Entry<String, Integer> entry : getMarkerSetLevels().entrySet()) {
+      byLevel.computeIfAbsent( entry.getValue(), level -> new ArrayList<>() )
+          .add( entry.getKey() );
+    }
+
+    return byLevel;
+  }
+
+  /**
+   * @method getMarkerSetLevel - The level a marker set sits at.
+   * @param markerSetId The BlueMap marker set id.
+   * @return Its level, or DEFAULT_MARKER_SET_LEVEL if it is not configured.
+   */
+  public static int getMarkerSetLevel(String markerSetId) {
+    return getMarkerSetLevels().getOrDefault( markerSetId, DEFAULT_MARKER_SET_LEVEL );
+  }
+
+  /**
+   * @method setMarkerSetLevel - Move an already configured marker set to a level.
+   * @param markerSetId The BlueMap marker set id.
+   * @param level The level to move it to.
+   * @return true if it was moved, false if the set is not configured.
+   */
+  public static boolean setMarkerSetLevel(String markerSetId, int level) {
+    if (!getMarkerSetLevels().containsKey( markerSetId )) return false;
+
+    pluginConfFile.set(MARKER_SETS_PATH + "." + markerSetId, level);
+    savePluginConfFile();
+
+    return true;
+  }
+
+  /**
+   * @method addMarkerSet - Add a marker set id at a level and persist it.
+   * @param markerSetId The BlueMap marker set id to add.
+   * @param level The level to place it at.
+   * @return true if it was added, false if it was already configured.
+   */
+  public static boolean addMarkerSet(String markerSetId, int level) {
+    if (getMarkerSetLevels().containsKey( markerSetId )) return false;
+
+    pluginConfFile.set(MARKER_SETS_PATH + "." + markerSetId, level);
+    savePluginConfFile();
+
+    return true;
+  }
+
+  /**
+   * @method addMarkerSet - Add a marker set id at the default level.
    * @param markerSetId The BlueMap marker set id to add.
    * @return true if it was added, false if it was already configured.
    */
   public static boolean addMarkerSet(String markerSetId) {
-    List<String> markerSets = getMarkerSets();
-    if (markerSets.contains(markerSetId)) return false;
-
-    markerSets.add(markerSetId);
-    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
-    savePluginConfFile();
-
-    return true;
+    return addMarkerSet( markerSetId, DEFAULT_MARKER_SET_LEVEL );
   }
 
   /**
@@ -197,10 +303,9 @@ public class ConfigHandler {
    * @return true if it was removed, false if it was not configured.
    */
   public static boolean removeMarkerSet(String markerSetId) {
-    List<String> markerSets = getMarkerSets();
-    if (!markerSets.remove(markerSetId)) return false;
+    if (!getMarkerSetLevels().containsKey( markerSetId )) return false;
 
-    pluginConfFile.set(MARKER_SETS_PATH, markerSets);
+    pluginConfFile.set(MARKER_SETS_PATH + "." + markerSetId, null);
     savePluginConfFile();
 
     return true;
@@ -285,7 +390,11 @@ public class ConfigHandler {
     comments.add( "Wilderness-Name: The title to appear when the player is outside all known marker areas." );
     comments.add( "Maps: The list of maps to load and their marker sets." );
     comments.add( "  name: The name of the map to load." );
-    comments.add( "  marker-sets: The list of marker sets to load for the map." );
+    comments.add( "  marker-sets: The marker sets to load, mapped to their zone level." );
+    comments.add( "    Level 1 is the broadest tier; higher numbers nest inside it." );
+    comments.add( "    Marker sets sharing a level merge into one zone space." );
+    comments.add( "    A set with no level defaults to level " + DEFAULT_MARKER_SET_LEVEL + "." );
+    comments.add( "    A plain list of ids is still accepted and converted on load." );
     return comments;
   }
 }

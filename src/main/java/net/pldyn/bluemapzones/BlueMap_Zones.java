@@ -9,7 +9,9 @@ import net.pldyn.bluemapzones.commands.toggleNoticeCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 
 public final class BlueMap_Zones extends JavaPlugin {
@@ -23,7 +25,7 @@ public final class BlueMap_Zones extends JavaPlugin {
   private BlueMapAPI bma;
   private static BlueMap_Zones BMZ;
 
-  private ArrayList<ZonedShape> zonedShapes = new ArrayList<>();
+  private TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel = new TreeMap<>();
   private boolean runningGeneration = false;
 
   @Override
@@ -49,7 +51,7 @@ public final class BlueMap_Zones extends JavaPlugin {
     if (UUID != null) return;
 
     UUID = java.util.UUID.randomUUID();
-    movementHandler = new MovementHandler(zonedShapes);
+    movementHandler = new MovementHandler(zonesByLevel);
     // Resolves zones through movementHandler, so it holds no shape list of its own
     // and cannot go stale after a regeneration.
     toolHandler = new ToolHandler();
@@ -111,16 +113,24 @@ public final class BlueMap_Zones extends JavaPlugin {
   }
 
   /**
-   * @method setZonedShapes - Publish a completed generation to everything that reads zones.
-   * @param newShapes The shapes the generator produced.
+   * @method setZonesByLevel - Publish a completed generation to everything that reads zones.
+   * @param newZones The shapes the generator produced, keyed by level.
    */
-  public void setZonedShapes(ArrayList<ZonedShape> newShapes) {
-    // Copy rather than alias. The generator owns its own list, and previously
-    // this method cleared the very list it was being handed, wiping every
-    // regeneration after the first.
-    this.zonedShapes = new ArrayList<>( newShapes );
+  public void setZonesByLevel(TreeMap<Integer, ArrayList<ZonedShape>> newZones) {
+    // Copy rather than alias. The generator owns its own structure, and an earlier
+    // version of this method cleared the very list it was being handed, wiping
+    // every regeneration after the first.
+    TreeMap<Integer, ArrayList<ZonedShape>> copy = new TreeMap<>();
+    for (Map.Entry<Integer, ArrayList<ZonedShape>> entry : newZones.entrySet()) {
+      copy.put( entry.getKey(), new ArrayList<>( entry.getValue() ) );
+    }
 
-    movementHandler.setZonedShapes( this.zonedShapes );
+    this.zonesByLevel = copy;
+    movementHandler.setZonesByLevel( this.zonesByLevel );
+  }
+
+  public TreeMap<Integer, ArrayList<ZonedShape>> getZonesByLevel() {
+    return zonesByLevel;
   }
 
   public BlueMapAPI getBlueMapAPI() {

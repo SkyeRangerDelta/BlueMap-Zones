@@ -12,19 +12,28 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
 
+import static net.pldyn.bluemapzones.ConfigHandler.DEFAULT_MARKER_SET_LEVEL;
 import static net.pldyn.bluemapzones.ConfigHandler.addMarkerSet;
-import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSets;
+import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSetLevels;
+import static net.pldyn.bluemapzones.ConfigHandler.getMarkerSetsByLevel;
 import static net.pldyn.bluemapzones.ConfigHandler.removeMarkerSet;
+import static net.pldyn.bluemapzones.ConfigHandler.setMarkerSetLevel;
 import static net.pldyn.bluemapzones.MessageHandler.send;
 
 /**
- * Manages which BlueMap marker sets zones are built from, so the config never
- * has to be edited by hand. Available ids are read live from the BlueMap API.
+ * Manages which BlueMap marker sets zones are built from, and what level each sits at,
+ * so the config never has to be edited by hand. Available ids are read live from the
+ * BlueMap API.
+ *
+ * <p>Level 1 is the broadest tier and higher numbers nest inside it. Sets sharing a
+ * level form one merged zone space.</p>
  */
 public class markerSetCommand implements TabExecutor {
 
-  private static final List<String> SUBCOMMANDS = List.of( "add", "remove", "list" );
+  private static final List<String> SUBCOMMANDS = List.of( "add", "remove", "level", "list" );
 
   @Override
   public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
@@ -37,6 +46,7 @@ public class markerSetCommand implements TabExecutor {
       case "list" -> doList( sender );
       case "add" -> doAdd( sender, args );
       case "remove" -> doRemove( sender, args );
+      case "level" -> doLevel( sender, args );
       default -> {
         send( sender, "Unknown subcommand '" + args[0] + "'.", NamedTextColor.RED );
         sendUsage( sender );
@@ -47,32 +57,42 @@ public class markerSetCommand implements TabExecutor {
   }
 
   /**
-   * @method doList - Show which marker sets are configured and which are available.
+   * @method doList - Show configured sets grouped by level, and what else is available.
    * @param sender Whoever ran the command.
    */
   private void doList(CommandSender sender) {
-    List<String> configured = getMarkerSets();
+    SortedMap<Integer, List<String>> byLevel = getMarkerSetsByLevel();
+
+    if (byLevel.isEmpty()) {
+      send( sender, "No marker sets are configured.", NamedTextColor.YELLOW );
+    }
+    else {
+      send( sender, "Configured marker sets (level 1 is broadest):", NamedTextColor.AQUA );
+
+      for (Map.Entry<Integer, List<String>> entry : byLevel.entrySet()) {
+        send( sender, "  Level " + entry.getKey() + ": "
+            + String.join( ", ", entry.getValue() ), NamedTextColor.AQUA );
+      }
+    }
+
     List<String> available = availableMarkerSets( sender );
-
-    send( sender, "Configured marker sets: "
-        + (configured.isEmpty() ? "(none)" : String.join( ", ", configured )),
-        NamedTextColor.AQUA );
-
     if (available == null) return;
 
-    send( sender, "Available on this map: "
+    available.removeAll( getMarkerSetLevels().keySet() );
+
+    send( sender, "Available to add: "
         + (available.isEmpty() ? "(none)" : String.join( ", ", available )),
         NamedTextColor.AQUA );
   }
 
   /**
-   * @method doAdd - Add a marker set to the config, then rebuild zones.
+   * @method doAdd - Add a marker set at a level, then rebuild zones.
    * @param sender Whoever ran the command.
    * @param args The raw command arguments.
    */
   private void doAdd(CommandSender sender, String[] args) {
     if (args.length < 2) {
-      send( sender, "Usage: /bmz-markerset add <marker-set>", NamedTextColor.RED );
+      send( sender, "Usage: /bmz-markerset add <marker-set> [level]", NamedTextColor.RED );
       return;
     }
 
@@ -88,23 +108,17 @@ public class markerSetCommand implements TabExecutor {
       return;
     }
 
-    if (!addMarkerSet( markerSetId )) {
+    Integer level = args.length >= 3 ? parseLevel( sender, args[2] ) : DEFAULT_MARKER_SET_LEVEL;
+    if (level == null) return;
+
+    if (!addMarkerSet( markerSetId, level )) {
       send( sender, "Marker set '" + markerSetId + "' is already configured.",
           NamedTextColor.YELLOW );
       return;
     }
 
-    send( sender, "Added marker set '" + markerSetId + "'.", NamedTextColor.GREEN );
-
-    // ZoneGenerator only builds configuredSets.getFirst(), so anything beyond the
-    // first entry is stored but never used. Say so rather than implying it works.
-    List<String> configured = getMarkerSets();
-    if (configured.size() > 1) {
-      send( sender, "Heads up: only the first configured marker set ('"
-          + configured.getFirst() + "') is currently built, so '" + markerSetId
-          + "' will be stored but not used yet.", NamedTextColor.YELLOW );
-    }
-
+    send( sender, "Added marker set '" + markerSetId + "' at level " + level + ".",
+        NamedTextColor.GREEN );
     regenerate( sender );
   }
 
@@ -122,15 +136,65 @@ public class markerSetCommand implements TabExecutor {
     String markerSetId = args[1];
 
     if (!removeMarkerSet( markerSetId )) {
-      List<String> configured = getMarkerSets();
       send( sender, "Marker set '" + markerSetId + "' is not configured. Configured: "
-          + (configured.isEmpty() ? "(none)" : String.join( ", ", configured )),
-          NamedTextColor.RED );
+          + describeConfigured(), NamedTextColor.RED );
       return;
     }
 
     send( sender, "Removed marker set '" + markerSetId + "'.", NamedTextColor.GREEN );
     regenerate( sender );
+  }
+
+  /**
+   * @method doLevel - Move an already configured marker set to a different level.
+   * @param sender Whoever ran the command.
+   * @param args The raw command arguments.
+   */
+  private void doLevel(CommandSender sender, String[] args) {
+    if (args.length < 3) {
+      send( sender, "Usage: /bmz-markerset level <marker-set> <level>", NamedTextColor.RED );
+      return;
+    }
+
+    String markerSetId = args[1];
+    Integer level = parseLevel( sender, args[2] );
+    if (level == null) return;
+
+    if (!setMarkerSetLevel( markerSetId, level )) {
+      send( sender, "Marker set '" + markerSetId + "' is not configured. Configured: "
+          + describeConfigured(), NamedTextColor.RED );
+      return;
+    }
+
+    send( sender, "Moved marker set '" + markerSetId + "' to level " + level + ".",
+        NamedTextColor.GREEN );
+    regenerate( sender );
+  }
+
+  /**
+   * @method parseLevel - Read and validate a level argument.
+   * @param sender Whoever ran the command, so the failure can be explained.
+   * @param raw The raw argument.
+   * @return The level, or null if it was not a positive whole number.
+   */
+  private Integer parseLevel(CommandSender sender, String raw) {
+    int level;
+
+    try {
+      level = Integer.parseInt( raw );
+    }
+    catch (NumberFormatException levelErr) {
+      send( sender, "Level must be a whole number, got '" + raw + "'.", NamedTextColor.RED );
+      return null;
+    }
+
+    if (level < 1) {
+      send( sender, "Level must be 1 or higher. Level 1 is the broadest tier.",
+          NamedTextColor.RED );
+      return null;
+    }
+
+    return level;
   }
 
   /**
@@ -167,9 +231,16 @@ public class markerSetCommand implements TabExecutor {
     return new ArrayList<>( map.getMarkerSets().keySet() );
   }
 
+  private String describeConfigured() {
+    List<String> configured = new ArrayList<>( getMarkerSetLevels().keySet() );
+    return configured.isEmpty() ? "(none)" : String.join( ", ", configured );
+  }
+
   private void sendUsage(CommandSender sender) {
-    send( sender, "Usage: /bmz-markerset <add|remove|list> [marker-set]",
+    send( sender, "Usage: /bmz-markerset <add|remove|level|list> [marker-set] [level]",
         NamedTextColor.YELLOW );
+    send( sender, "Level 1 is broadest; higher levels nest inside it. Sets sharing a "
+        + "level merge into one zone space.", NamedTextColor.GRAY );
   }
 
   @Override
@@ -179,24 +250,47 @@ public class markerSetCommand implements TabExecutor {
     }
 
     if (args.length == 2) {
-      // "add" offers what BlueMap has that is not configured yet; "remove" offers
-      // what is configured. "list" takes no argument.
+      // "add" offers what BlueMap has that is not configured yet; the others
+      // operate on what is already configured. "list" takes no argument.
       switch (args[0].toLowerCase()) {
         case "add" -> {
           BlueMapMap map = BlueMap_Zones.getInstance().getConfiguredMap();
           if (map == null) return new ArrayList<>();
 
           List<String> candidates = new ArrayList<>( map.getMarkerSets().keySet() );
-          candidates.removeAll( getMarkerSets() );
+          candidates.removeAll( getMarkerSetLevels().keySet() );
 
           return StringUtil.copyPartialMatches( args[1], candidates, new ArrayList<>() );
         }
-        case "remove" -> {
-          return StringUtil.copyPartialMatches( args[1], getMarkerSets(), new ArrayList<>() );
+        case "remove", "level" -> {
+          return StringUtil.copyPartialMatches( args[1],
+              new ArrayList<>( getMarkerSetLevels().keySet() ), new ArrayList<>() );
         }
       }
     }
 
+    if (args.length == 3 && (args[0].equalsIgnoreCase( "add" ) || args[0].equalsIgnoreCase( "level" ))) {
+      return StringUtil.copyPartialMatches( args[2], suggestLevels(), new ArrayList<>() );
+    }
+
     return new ArrayList<>();
+  }
+
+  /**
+   * @method suggestLevels - Levels already in use, plus the next one down.
+   * @return {List<String>}
+   */
+  private List<String> suggestLevels() {
+    SortedMap<Integer, List<String>> byLevel = getMarkerSetsByLevel();
+    List<String> levels = new ArrayList<>();
+
+    for (Integer level : byLevel.keySet()) {
+      levels.add( String.valueOf( level ) );
+    }
+
+    int next = byLevel.isEmpty() ? DEFAULT_MARKER_SET_LEVEL : byLevel.lastKey() + 1;
+    levels.add( String.valueOf( next ) );
+
+    return levels;
   }
 }
