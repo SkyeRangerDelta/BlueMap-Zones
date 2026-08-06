@@ -193,12 +193,14 @@ public class ConfigHandler {
 
     List<String> flatSets = pluginConfFile.getStringList(MARKER_SETS_PATH);
 
-    Map<String, Object> levelled = new LinkedHashMap<>();
+    // Write each entry on its dotted path. Handing set() a Map stores a raw Map that
+    // getConfigurationSection() will not return until the file has been round-tripped
+    // through YAML, so the sets would read as empty for the rest of the session.
+    pluginConfFile.set(MARKER_SETS_PATH, null);
     for (String markerSetId : flatSets) {
-      levelled.put(markerSetId, DEFAULT_MARKER_SET_LEVEL);
+      pluginConfFile.set(MARKER_SETS_PATH + "." + markerSetId, DEFAULT_MARKER_SET_LEVEL);
     }
 
-    pluginConfFile.set(MARKER_SETS_PATH, levelled);
     savePluginConfFile();
 
     if (!flatSets.isEmpty()) {
