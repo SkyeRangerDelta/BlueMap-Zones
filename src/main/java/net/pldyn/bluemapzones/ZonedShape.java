@@ -42,6 +42,53 @@ public class ZonedShape extends ShapeMarker {
     return level;
   }
 
+  /**
+   * @method containsBlock - Test whether a world position falls inside this shape.
+   *     Uses the marker's real polygon rather than inferring from boundary chunks, so
+   *     nested and overlapping shapes resolve exactly.
+   * @param blockX World X.
+   * @param blockZ World Z.
+   * @return true if the point is inside the polygon.
+   */
+  public boolean containsBlock(double blockX, double blockZ) {
+    Vector2d min = getShape().getMin();
+    Vector2d max = getShape().getMax();
+
+    // Cheap rejection before the per-edge work.
+    if (blockX < min.getX() || blockX > max.getX()) return false;
+    if (blockZ < min.getY() || blockZ > max.getY()) return false;
+
+    Vector2d[] points = getShape().getPoints();
+    boolean inside = false;
+
+    // Even-odd rule: count edge crossings of a ray heading in -X from the point.
+    for (int i = 0, j = points.length - 1; i < points.length; j = i++) {
+      double xi = points[i].getX();
+      double zi = points[i].getY();
+      double xj = points[j].getX();
+      double zj = points[j].getY();
+
+      boolean straddles = (zi > blockZ) != (zj > blockZ);
+      if (straddles && blockX < (xj - xi) * (blockZ - zi) / (zj - zi) + xi) {
+        inside = !inside;
+      }
+    }
+
+    return inside;
+  }
+
+  /**
+   * @method getBoundingArea - Area of the shape's bounding box, used to pick the most
+   *     specific shape when several contain the same point.
+   * @return The bounding box area in square blocks.
+   */
+  public double getBoundingArea() {
+    Vector2d min = getShape().getMin();
+    Vector2d max = getShape().getMax();
+
+    return (max.getX() - min.getX()) * (max.getY() - min.getY());
+  }
+
   public HashMap<Vector2d, ZonedChunk> getOwnedChunks() {
     return ownedChunks;
   }
