@@ -23,12 +23,6 @@ public class MovementHandler implements Listener {
   private static final Logger Log = Logger.getLogger("BM Zones");
   private static final HashMap<Player, PCLocationHistory> playerLocations = new HashMap<>();
 
-  /** How far a ray travels, in chunks, before giving up on finding a boundary. */
-  private static final int RAY_LENGTH = 250;
-
-  /** A zone must be hit in all four cardinal directions to count as containing you. */
-  private static final int RAY_HITS_REQUIRED = 4;
-
   private TreeMap<Integer, ArrayList<ZonedShape>> zonesByLevel;
 
   private static String WILDERNESS = (String) ConfigHandler.getPluginConfFile().get( "Wilderness-Name" );
@@ -86,14 +80,24 @@ public class MovementHandler implements Listener {
     PCLocationHistory history =
         playerLocations.computeIfAbsent( pc, key -> new PCLocationHistory() );
 
-    boolean changed = false;
+    boolean entered = false;
     boolean deepestConflicted = false;
+    boolean occupiesAnything = false;
+
+    boolean wasSomewhere = false;
+    for (Integer level : zonesByLevel.keySet()) {
+      if (history.getAreaName( level ) != null) {
+        wasSomewhere = true;
+        break;
+      }
+    }
 
     // Broadest level first, so the last occupied level seen is the deepest.
     for (Integer level : zonesByLevel.keySet()) {
       Resolution resolved = resolveLevel( level, chunkId );
 
       history.setAreaName( level, resolved.name );
+      if (resolved.name != null) occupiesAnything = true;
 
       if (resolved.conflicted) {
         // Standing on a shared border. Leave the non-conflicted name alone so
@@ -104,21 +108,28 @@ public class MovementHandler implements Listener {
 
       deepestConflicted = false;
 
-      if (!Objects.equals( resolved.name, history.getNonConflictedAreaName( level ) )) {
-        history.setNonConflictedAreaName( level, resolved.name );
-        changed = true;
-      }
+      boolean isNew = !Objects.equals( resolved.name, history.getNonConflictedAreaName( level ) );
+      history.setNonConflictedAreaName( level, resolved.name );
+
+      // Only *entering* somewhere is worth announcing. Walking out of a city back
+      // into the state that contains it is not news, so a level going empty does
+      // not fire on its own.
+      if (isNew && resolved.name != null) entered = true;
     }
 
-    if (!announce || !changed || deepestConflicted) return;
+    // Leaving every zone at once is the exception: that genuinely is a new place.
+    boolean leftEverything = !occupiesAnything && wasSomewhere;
+
+    if (!announce || deepestConflicted) return;
+    if (!entered && !leftEverything) return;
 
     sendNotice( pc, history );
   }
 
   /**
    * @method resolveLevel - Identify the zone a chunk belongs to within one level.
-   *     Levels are resolved independently so a city nested inside a state does not
-   *     steal the state's rays.
+   *     Boundary chunks are looked up directly; interiors are resolved against the
+   *     marker polygons. Levels never see each other's shapes.
    * @param level The zone level to search.
    * @param chunkId The chunk to identify.
    * @return The resolved name (null when in no zone) and whether it is a shared border.
@@ -127,10 +138,36 @@ public class MovementHandler implements Listener {
     ZonedChunk chunk = getChunk( level, chunkId );
     if (chunk != null) return new Resolution( chunk.getName(), chunk.isConflicted() );
 
-    ZonedShape zone = castRayInAllDirections( level, chunkId );
+    ZonedShape zone = findContainingShape( level, chunkId );
     if (zone != null) return new Resolution( zone.getLabel(), false );
 
     return new Resolution( null, false );
+  }
+
+  /**
+   * @method findContainingShape - Find the shape at a level that contains a chunk,
+   *     testing the marker polygons directly. When several contain it - a city inside a
+   *     county sharing a level - the smallest wins, so the most specific zone is used.
+   * @param level The zone level to search.
+   * @param chunkId The chunk to identify.
+   * @return The containing shape, or null.
+   */
+  private ZonedShape findContainingShape(int level, Vector2d chunkId) {
+    // Test the middle of the chunk rather than a corner, so a chunk straddling an
+    // edge resolves to whichever side holds most of it.
+    double blockX = chunkId.getFloorX() * 16.0 + 8.0;
+    double blockZ = chunkId.getFloorY() * 16.0 + 8.0;
+
+    ZonedShape smallest = null;
+
+    for (ZonedShape zone : zonesByLevel.getOrDefault( level, new ArrayList<>() )) {
+      if (!zone.containsBlock( blockX, blockZ )) continue;
+      if (smallest == null || zone.getBoundingArea() < smallest.getBoundingArea()) {
+        smallest = zone;
+      }
+    }
+
+    return smallest;
   }
 
   /**
@@ -197,107 +234,6 @@ public class MovementHandler implements Listener {
   private boolean hasChangedChunks(Location oldLoc, Location newLoc) {
     return Math.floorDiv(newLoc.getBlockX(), 16) != Math.floorDiv(oldLoc.getBlockX(), 16) ||
         Math.floorDiv(newLoc.getBlockZ(), 16) != Math.floorDiv(oldLoc.getBlockZ(), 16);
-  }
-
-  /**
-   * @method runBresenham - Walk a line of chunks, stopping at the first one owned by a
-   *     shape at the given level.
-   * @param level The zone level to test against.
-   * @param start The starting chunk.
-   * @param end The chunk to walk toward.
-   * @return The chunk ids walked, ending at the first owned chunk if one was hit.
-   */
-  private ArrayList<Vector2d> runBresenham(int level, Vector2d start, Vector2d end) {
-    ArrayList<Vector2d> lineIds = new ArrayList<>();
-
-    int x1 = start.getFloorX();
-    int x2 = end.getFloorX();
-    int y1 = start.getFloorY();
-    int y2 = end.getFloorY();
-
-    int dx = Math.abs(x2 - x1);
-    int dy = Math.abs(y2 - y1);
-
-    int sx = Integer.signum(x2 - x1);
-    int sy = Integer.signum(y2 - y1);
-
-    boolean swap = dy > dx;
-    if (swap) {
-      int temp = dx;
-      dx = dy;
-      dy = temp;
-    }
-
-    int error = 2 * dy - dx;
-
-    int x = x1;
-    int y = y1;
-
-    for (int i = 0; i <= dx; i++) {
-      Vector2d currentId = new Vector2d(x, y);
-      lineIds.add(currentId);
-
-      if (getChunk(level, currentId) != null) {
-        return lineIds;
-      }
-
-      while (error >= 0) {
-        if (swap) {
-          x += sx;
-        } else {
-          y += sy;
-        }
-        error -= 2 * dx;
-      }
-
-      if (swap) {
-        y += sy;
-      } else {
-        x += sx;
-      }
-      error += 2 * dy;
-    }
-
-    return lineIds;
-  }
-
-  /**
-   * @method castRayInAllDirections - Decide whether a chunk sits inside a shape at a
-   *     level by casting rays outward. Only boundary chunks are stored, so interiors
-   *     have to be inferred this way.
-   * @param level The zone level to test against.
-   * @param playerLocation The chunk the player is in.
-   * @return The containing shape, or null.
-   */
-  private ZonedShape castRayInAllDirections(int level, Vector2d playerLocation) {
-    HashMap<ZonedShape, Integer> zoneCount = new HashMap<>();
-
-    Vector2d[] directions = {
-        new Vector2d( 0, 1 ),   // North
-        new Vector2d( 0, - 1 ),  // South
-        new Vector2d( 1, 0 ),   // East
-        new Vector2d( - 1, 0 )   // West
-    };
-
-    for ( Vector2d direction : directions ) {
-      Vector2d endPoint = playerLocation.add( direction.mul( RAY_LENGTH ) );
-      ArrayList< Vector2d > rayCastResult = runBresenham( level, playerLocation, endPoint );
-
-      for ( Vector2d chunkId : rayCastResult ) {
-        ZonedChunk chunk = getChunk( level, chunkId );
-        if ( chunk == null ) continue;
-
-        for ( ZonedShape zone : chunk.getOwners() ) {
-          if ( zone != null ) zoneCount.merge( zone, 1, Integer::sum );
-        }
-      }
-    }
-
-    for ( Map.Entry<ZonedShape, Integer> entry : zoneCount.entrySet() ) {
-      if (entry.getValue() >= RAY_HITS_REQUIRED) return entry.getKey();
-    }
-
-    return null;
   }
 
   /**
